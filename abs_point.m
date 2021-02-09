@@ -32,7 +32,7 @@ classdef abs_point
         
         function obj = draw(obj, varargin)
             %draw the point, eventually with its tag
-            if( nargin >1 && strcmp( varargin{1} , "at") )
+            if( nargin >1 && strcmp( varargin{1} , 'at') )
                 figure(varargin{2});
             else
                 figure(gcf);
@@ -61,7 +61,14 @@ classdef abs_point
             %transformation H is applied
             obj.params = H * obj.params ;
         end
-     
+        
+        function y_n = is_valid(obj)
+            if( sum(obj.params == [0,0,1]') ~= 3 )
+                y_n = 1;
+            else
+                y_n = 0;
+            end
+        end
     end
 end
 

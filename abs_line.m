@@ -126,6 +126,14 @@ classdef abs_line
                    obj.p2 = obj.p2/obj.p2(3);
                end
         end
+        
+        function y_n = is_valid( obj )
+           if( sum(obj.params == [0, 0, 1]') ~=3 )
+               y_n = 1;
+           else
+               y_n = 0;
+           end
+        end
     end
 end
 
