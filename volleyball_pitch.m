@@ -151,5 +151,26 @@ classdef volleyball_pitch
             end
         end
         
+        function [obj_, error] = complete(obj, P, real_pitch)
+            %COMPLETE Creates a new istance of a pitch on the image
+            % It projects all the real points on the image.
+            % Plus it computes the average error between the new points and those that were present in the original image
+            obj_ = obj;
+            error = 0;
+            valid_points = 0;
+           for idx = 1:14
+               %3x1 = 3x4 * [3x1; 1x1];
+               obj_.pitch(idx).params = P* [real_pitch.pitch(idx).params; 1];
+               obj_.pitch(idx) = obj_.pitch(idx).normalize();
+               if( obj.pitch(idx).is_valid() ) 
+                   d = obj_.pitch(idx).params(1:2)-obj.pitch(idx).params(1:2); 
+                   error = error + d'*d;
+                   valid_points = valid_points +1;
+               end
+               
+           end
+            error = error/valid_points;
+        end
+        
     end
 end

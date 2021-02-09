@@ -199,4 +199,6 @@ hold on;
 pose = rigid3d( R', O');
 cam = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
 
+[image_pitch_, error] = image_pitch.complete(P, real_pitch);
+
 %save stuff 
