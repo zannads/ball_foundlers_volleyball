@@ -1,26 +1,25 @@
 prog_dir = '/Users/denniszanutto/Documents/GitHub/ball_foundlers_volleyball';
-file_dir = '/Users/denniszanutto/Downloads/Pallavolo.mp4';
+file_dir = '/Users/denniszanutto/Downloads/Pallavolo_1.mp4';
 
 
 videoReader = VideoReader( file_dir);
 videoReader.CurrentTime = 5;
 videoFrame      = readFrame(videoReader);
-% figure;
-% imshow(videoFrame)
-% 
-% im_g = rgb2gray(videoFrame);
-% edgs = edge(im_g,'canny', [0.1, 0.4]);
-% figure;
-% imshow(edgs)
+
+ im_g = rgb2gray(videoFrame);
+edgs = edge(im_g,'canny', [0.08, 0.2]);
+figure;
+imshow(edgs)
 %%
 num_lines = 3;
 
 %super ok dire 1 e 2
-canny_pam = {[0.1, 0.2], [0.1, 0.2], [0.1, 0.2]};
+canny_pam = {[0.1, 0.5], [0.1, 0.5], [0.08, 0.15]};
 rho_res = {1, 1, 1};
-theta_res = {40:0.1:85, -84.5:0.1:-40, -10:0.5:10};
+theta_res = {30:0.1:85, -84.5:0.1:-40, -10:0.1:10};
+n_hood_size = { [61, 51], [61, 101], [59, 5]};  %default sizeH/50
 fill_gap_length = 10; %default 20
-min_length = {60, 30, 20};
+min_length = {100, 30, 20};
 
 limit_n_lines = 10;
 
@@ -44,7 +43,7 @@ while idx <= num_lines
     %figure; imshow(edgs);
     
     [H,theta,rho] = hough(edgs, 'RhoResolution', rho_res{idx}, 'Theta', theta_res{idx});
-    P = houghpeaks(H, limit_n_lines, 'threshold', ceil(0.3*max(H(:))));
+    P = houghpeaks(H, limit_n_lines, 'threshold', ceil(0.3*max(H(:))), 'NHoodSize', n_hood_size{idx});
     lines = houghlines(edgs,theta,rho,P,'FillGap',fill_gap_length,'MinLength',min_length{idx});
     
     glines = regroup_houghlines( lines );
@@ -92,19 +91,22 @@ hold off;
 set_vpoints(3,1) = abs_point();
 set_vpoints(1) = estimate_lsq( set_plines{1}, 'vp', 'v1' );
 set_vpoints(2) = estimate_lsq( set_plines{2}, 'vp', 'v2' );
-set_vpoints(3) = estimate_lsq( set_plines{3}([7, 8, 10]), 'vp', 'v3');
+set_vpoints(3) = estimate_lsq( set_plines{3}([1, 2, 4, 5, 6, 7, 8]), 'vp', 'v3');
 
-
+% it Would be nice to do it from the image
+% str = input(prompt,'s')
 lx_1 = set_plines{2}(1);
 lx_0 = set_plines{2}(2);
 
-ly_0 = set_plines{1}(6);
-ly_1 = set_plines{1}(2);
-ly_2 = set_plines{1}(7);
-ly_2n = set_plines{1}(5);
+ly_0 = set_plines{1}(2);
+ly_1 = set_plines{1}(1);
+ly_2 = set_plines{1}(6);
+ly_1n = set_plines{1}(5);
+%ly_2n = set_plines{1}(5);
 
 net_up = set_plines{1}(4);
-net_height = 2.24; %m %femminile
+%net_height = 2.24; %m %femminile
+net_height = 2.43; %m
 
 pitch_coordinates = [0, 0, 0;
           3, 0, 0;
@@ -129,8 +131,10 @@ pitch_im(4) = abs_point( lx_1.intersection( ly_2 ), 'D');
 pitch_im(5) = abs_point( lx_1.intersection( ly_1 ), 'E');
 %F
 pitch_im(6) = abs_point( lx_1.intersection( ly_0 ), 'F');
+%G
+pitch_im(7) = abs_point( lx_1.intersection( ly_0 ), 'G');
 %H
-pitch_im(7) = abs_point( lx_1.intersection( ly_2n ), 'H');
+%pitch_im(7) = abs_point( lx_1.intersection( ly_2n ), 'H');
 %I 
 pitch_im(8) = abs_point( lx_0.intersection( ly_2n ), 'I');
 
@@ -178,4 +182,6 @@ cam = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
 % to draw a coloured rectangle
 % rectangle
 
+%%
+%try to find the homography between images
 
