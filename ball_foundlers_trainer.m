@@ -1,5 +1,5 @@
 prog_dir = '/Users/denniszanutto/Documents/GitHub/ball_foundlers_volleyball';
-file_dir = '/Users/denniszanutto/Downloads/Pallavolo.mp4';
+file_dir = '/Users/denniszanutto/Downloads/Pallavolo_1.mp4';
 
 save_pos_folder = '/Users/denniszanutto/Downloads/pos_samples';
 addpath(save_pos_folder);
@@ -90,7 +90,9 @@ videoLabeler( save_pos_folder );
 
 % %save( gTruth );
 %%
-positive_data = table( gTruth.DataSource.Source, gTruth.LabelData.ball );
+gTruth = load('PALLAVOLO_1_test_label.mat');
+gTruth = gTruth.gTruth;
+positive_data = table( {gTruth.DataSource.Source}, gTruth.LabelData.Player_1 );
 
 %%
 % now it's possible to start training
@@ -99,7 +101,9 @@ positive_data = table( gTruth.DataSource.Source, gTruth.LabelData.ball );
 
 negative_data = imageDatastore(save_neg_folder);
 
-trainCascadeObjectDetector('ball_foundler.xml',positive_data, ...
+positive_data = objectDetectorTrainingData(gTruth);
+
+trainCascadeObjectDetector('ball_foundler.xml',positive_data(:, [1, 4]), ...
     negative_data,'FalseAlarmRate',0.1,'NumCascadeStages',5);
 
 detector = vision.CascadeObjectDetector('ball_foundler.xml');
@@ -107,17 +111,37 @@ detector = vision.CascadeObjectDetector('ball_foundler.xml');
 %%
 % I should do validation
 %extract a random time
+close all;
 desired_time = rand(1)*T;
 
 % extract its frame
 video_reader.CurrentTime = desired_time;
 frame   = readFrame(video_reader);
-bbox = step(detector,frame);
+r = 255*(frame(:,:, 1) > 200);
+g = 255*(frame(:,:, 2) > 200);
+b = 255*(frame(:,:,3 ) < 80);
+k = cat(3, r, g, b);
+k = r & g & b;
+%imshow( frame & r & g & b );
 
-detectedImg = insertObjectAnnotation(frame,'rectangle',bbox,'Ball');
+frame_gray = rgb2gray(frame);
+
+hsv_frame = rgb2hsv( frame );
+r = (frame(:,:, 1) > 0.15 & frame(:,:, 1)< 0.17);
+g = (frame(:,:, 2) > 200);
+b = (frame(:,:,3 ) < 80);
+figure;
+imshow( r );
+figure;
+imshow( hsv_frame(:,:, :)  );
+figure;imshow(frame);
+%%
+bbox = step(detector, frame);
+
+detectedImg = insertObjectAnnotation(frame, 'rectangle', bbox(end-15:end, :), 'Player_1');
 
 figure; imshow(detectedImg);
-
+%%
 figure; imshow(frame);
 [featureVector,hogVisualization]  = extractHOGFeatures(frame);
 hold on 
@@ -130,7 +154,10 @@ imshow(bw)
 g = frame(:,:,2);
 [m, v] = size(g);
 figure;
-imshow( frame &( g > 100) & (g<200) &  );
+imshow( frame &( g > 100) & (g<200)  );
 title('G');
 figure;
 imshow(frame(:,:,3))
+
+%% 
+videoLabeler('/Users/denniszanutto/Downloads/Pallavolo_1.mp4');

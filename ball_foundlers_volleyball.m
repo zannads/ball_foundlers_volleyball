@@ -3,8 +3,15 @@ file_dir = '/Users/denniszanutto/Downloads/Pallavolo_1.mp4';
 
 
 videoReader = VideoReader( file_dir);
-videoReader.CurrentTime = 5;
+videoReader.CurrentTime = 130;
 video_frame      = readFrame(videoReader);
+
+peopleDetector = vision.PeopleDetector;
+[bboxes,scores] = peopleDetector(video_frame);
+video_frame = insertObjectAnnotation(video_frame,'rectangle',bboxes,scores);
+figure, imshow(video_frame)
+title('Detected people and detection scores');
+
 
 im_g = rgb2gray(video_frame);
 % edgs = edge(im_g,'canny', [0.08, 0.2]);
