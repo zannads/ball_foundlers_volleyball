@@ -4,12 +4,14 @@ classdef history_tracker
     
     properties
         image_coordinate;
+        radii;
         %hsv_scale;
         bbox;
         state;
         total_visible_count;
         consecutive_invisible;
         length;
+        starting_side;
     end
     
     methods
@@ -17,11 +19,13 @@ classdef history_tracker
             %UNTITLED3 Construct an instance of this class
             %   Detailed explanation goes here
             obj.image_coordinate{1} = [];
+            obj.radii{1} = [];
             obj.bbox{1} = [];
             obj.state{1} = "unknown";
             obj.length = 0;
             obj.total_visible_count = 0;
             obj.consecutive_invisible = 0;
+            obj.starting_side = 0;
         end
         
         function obj = add(obj,varargin)
@@ -30,6 +34,7 @@ classdef history_tracker
             if nargin == 1
                 obj.image_coordinate{end + 1} = [];
                 obj.bbox{end + 1} = [];
+                obj.radii{end + 1} = [];
                 obj.state{end + 1} = "unknown";
                 obj.length = obj.length + 1;
                 %unchanged obj.total_visible_count;
@@ -49,18 +54,7 @@ classdef history_tracker
                 %acquire pts from image
                 % set to known
                 % length = +1
-                figure; imshow(frame);
-                [x, y ]= getpts();
-                x = ceil( x) ;
-                y = ceil(y);
                 
-                obj.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
-                obj.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
-                obj.state{end} = "known";
-                obj.length = obj.length +1;
-                obj.total_visible_count = obj.total_visible_count + 1;
-                %reset
-                obj.consecutive_invisible = 0;
                 return;
             end
             
@@ -72,6 +66,7 @@ classdef history_tracker
                 % set to predicted
                 % length = length +1
                 obj.bbox{end+1} = obj.bbox{end};
+                obj.radii{end+1} = obj.radii{end};
                 obj.image_coordinate{end+1} = obj.image_coordinate{end};
                 obj.state{end+1} = "predicted";
                 obj.length = obj.length+1;
@@ -84,6 +79,7 @@ classdef history_tracker
             % altrimenti
             %liinear interp
             
+            current.radii = obj.radii{end};
             current.bbox = obj.bbox{end};
             current.image_coordinate = obj.image_coordinate{end};
             previous.bbox = obj.bbox{end};
@@ -99,6 +95,7 @@ classdef history_tracker
             new_area = current.bbox(3:4)*A_1/A_2;
             new_top = current.bbox(1:2) - ceil ((new_area-current.bbox(3:4))/2) ;
             
+            obj.radii{end +1} = current.radii*A_1/A_2;
             obj.bbox{end+1} = [new_top, new_area] ;
             obj.state{end+1} = "predicted";
             obj.length = obj.length + 1;
@@ -143,9 +140,9 @@ classdef history_tracker
                 %
                 % now use grades to validate it
                 % if it is enough save it to known
-                if (f_grade > 0.3 | hsv_grade > 0.3 | s_grade > 0.3)  %#ok<OR2>
+                if (f_grade > 0.3 | hsv_grade > 0.03 | s_grade > 0.3)  %#ok<OR2>
                     % update the bbox
-                    obj.bbox{end} = bbox_prediction(idx, :);
+                    obj.bbox{end} = bbox_prediction(1, :);
                     obj.image_coordinate{end} = [ (x_1+x_2)/2, (y_1+y_2)/2 ];
                     obj.state{end} = "known";
                     obj.total_visible_count = obj.total_visible_count +1;
@@ -174,7 +171,7 @@ classdef history_tracker
                     s_grade = sum(~mask_, 'all') / (bbox_prediction(3)*bbox_prediction(4) );
                 end
                 distance = norm( obj.image_coordinate{end-1}- [ (x_1+x_2)/2, (y_1+y_2)/2 ] );
-                area_increase = obj.bboxes{end-1};
+                area_increase = obj.bbox{end-1};
                 area_increase = area_increase(3)*area_increase(4)/  (bbox_prediction(3)*bbox_prediction(4) );
                 %             frame = varargin{4};
                 %             test with harris feauture

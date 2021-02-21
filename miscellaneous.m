@@ -3,7 +3,7 @@ file_dir = '/Users/denniszanutto/Downloads/Pallavolo_1.mp4';
 
 close all;
 videoReader = VideoReader( file_dir);
-videoReader.CurrentTime = 130;
+%videoReader.CurrentTime = 130;
 video_frame      = readFrame(videoReader);
 
 
