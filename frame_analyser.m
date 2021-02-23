@@ -70,7 +70,7 @@ classdef frame_analyser
             
             % template matching for start of the action
             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
-                            'BestMatchNeighborhoodOutputPort', true);
+                'BestMatchNeighborhoodOutputPort', true);
             
             % I'll create the object whnen I hear the whistle, doen't make
             % sense to track i out of the actions
@@ -87,18 +87,20 @@ classdef frame_analyser
         % It then performs morphological operations on the resulting binary mask to
         % remove noisy pixels and to fill the holes in the remaining blobs.
         
-        function [centroids, bboxes, mask] = foreground_analysis( obj, frame)
+        function [set] = foreground_analysis_bbox( obj, frame)
             
-            % Detect foreground.
-            mask = obj.f_detector.step(frame);
+            % Detect foreground and build the struct.
+            set.mask = obj.f_detector.step(frame);
+            set.bboxes = cell(0);
+            set.centroids = cell(0);
             
             % Apply morphological operations to remove noise and fill in holes.
-            mask = imopen(mask, strel('rectangle', [3,3]));
-            mask = imclose(mask, strel('rectangle', [15, 15]));
-            mask = imfill(mask, 'holes');
+            set.mask = imopen(set.mask, strel('rectangle', [3,3]));
+            set.mask = imclose(set.mask, strel('rectangle', [15, 15]));
+            set.mask = imfill(set.mask, 'holes');
             
             % Perform blob analysis to find connected components.
-            [~, centroids, bboxes] = obj.blob_analyser.step(mask);
+            [~, centroids, bboxes] = obj.blob_analyser.step(set.mask);
             
             %try to remove not squared boxes
             ratios = double(bboxes(:,4))./double(bboxes(:,3));
@@ -118,14 +120,33 @@ classdef frame_analyser
                 bboxes = [];
                 centroids = [];
             end
+            
+            % move to cells
+            for idx = 1:size(bboxes, 1)
+                set.bboxes{idx} = bboxes( idx, : );
+                set.centroids{idx} = centroids( idx, :);
+            end
         end
         
-        function obj = learn_background( obj, frame )
+        function [set] = foreground_analysis( obj, frame)
+            
+            % Detect foreground and build the struct.
+            mask = obj.f_detector.step(frame);
+            
+            % Apply morphological operations to remove noise and fill in holes.
+            mask = imopen(mask, strel('rectangle', [3,3]));
+            mask = imclose(mask, strel('rectangle', [15, 15]));
+            mask = imfill(mask, 'holes');
+            
+            set = arrange_prop( mask );          
+        end
+        
+        function [obj] = learn_background( obj, frame )
             % Detect foreground.
             [~] = obj.f_detector.step(frame);
         end
-            
-        function [mask] = hsv_analysis ( obj, frame )
+        
+        function [set] = hsv_analysis ( obj, frame )
             % try to look for yellows
             color = [0.15, 0.25];
             
@@ -137,16 +158,18 @@ classdef frame_analyser
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            bbox = obj.h_tracker( hsv_frame(:,:,1) ); %#ok<NASGU>
+            set = arrange_prop( mask );
+            % bbox = obj.h_tracker( hsv_frame(:,:,1) ); %#ok<NASGU>
         end
         
-        function [mask] = step_analysis( obj, frame )
+        function [set] = step_analysis( obj, frame )
             %analyssi between subsequnet frames
             mask = sum( abs( obj.old_frame-frame ), 3 ) > 20;
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
+            set = arrange_prop( mask );
             %motion = obj.block_matcher( frame, obj.old_frame ); %#ok<NASGU>
         end
         
@@ -162,8 +185,8 @@ classdef frame_analyser
             % now I just select it
             obj.ball = history_tracker();
             
-            if( obj.ball.starting_side == 0 ) % it's on the far side 
-                %it should be visible 
+            if( obj.ball.starting_side == 0 ) % it's on the far side
+                %it should be visible
                 
                 % known info for now it is okay
                 x = [839, 853];
@@ -178,17 +201,17 @@ classdef frame_analyser
                 %reset
                 obj.ball.consecutive_invisible = 0;
                 
-                % template matching 
-                target = imread( '/Users/denniszanutto/Downloads/target_image.jpg' );
-                roi_right_side = [740, 0, 525, 240];
-                
-                figure; imshow(frame); hold on; rectangle( 'Position', roi_right_side, 'EdgeColor', 'red');
-                
-                
-                pos = obj.template_matcher( rgb2gray( frame ), rgb2gray(target), roi_right_side ); 
-                viscircles( pos, 5 ); 
-            else 
-                % it's out of the picture or covered 
+                %                 % template matching
+                %                 target = imread( '/Users/denniszanutto/Downloads/target_image.jpg' );
+                %                 roi_right_side = [740, 0, 525, 240];
+                %
+                %                 figure; imshow(frame); hold on; rectangle( 'Position', roi_right_side, 'EdgeColor', 'red');
+                %
+                %
+                %                 pos = obj.template_matcher( rgb2gray( frame ), rgb2gray(target), roi_right_side );
+                %                 viscircles( pos, 5 );
+            else
+                % it's out of the picture or covered
                 
             end
         end

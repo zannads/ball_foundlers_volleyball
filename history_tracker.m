@@ -28,6 +28,7 @@ classdef history_tracker
             obj.starting_side = 0;
         end
         
+        % ok add, mai usata
         function obj = add(obj,varargin)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
@@ -47,7 +48,8 @@ classdef history_tracker
             end
         end
         
-        function obj = predict_location( obj , frame )
+        %ok predict
+        function obj = predict_location( obj , frame ) %#ok<INUSD>
             % se il precedente è unknown
             % chiedi punt
             if strcmp ( obj.state{end} , "unknown" )
@@ -103,6 +105,7 @@ classdef history_tracker
             obj.consecutive_invisible = obj.consecutive_invisible + 1;
         end
         
+        % da fare forte
         function obj = assignment(  obj, varargin )
             if strcmp( obj.state{end}, "known" )
                 return;
@@ -110,98 +113,30 @@ classdef history_tracker
             %If i decide that the prevision is correct, I need to increase
             %total visible count and set to 0 consecutive invisible
             
-            % the thing I trust more is my prediction, so I check on the
-            % prediction bbox if there is any non zero in the masks
             if strcmp( obj.state{end}, "predicted" )
-                bbox_prediction = obj.bbox{end};
-                y_1 = bbox_prediction(1, 2);
-                x_1 = bbox_prediction(1, 1);
-                y_2 = y_1 + bbox_prediction(1, 4)-1;
-                x_2 = x_1 + bbox_prediction(1, 3)-1;
+                f_set = varargin{1};
+                h_set = varargin{2};
+                s_set = varargin{3};
+                % get the n closest to prediction,
+                f_set = obj.select_strongest( f_set, 10 );
                 
-                % let's start that I know the order of the 3 mask
-                if ~isempty( varargin{1} )
-                    mask_ = varargin{1}(y_1:y_2, x_1:x_2 );
-                    f_grade = sum(mask_, 'all') / (bbox_prediction(3)*bbox_prediction(4) );
-                end
-                if ~isempty( varargin{2} )
-                    mask_ = varargin{2}(y_1:y_2, x_1:x_2 );
-                    hsv_grade = sum(mask_, 'all') / (bbox_prediction(3)*bbox_prediction(4) );
-                end
-                if ~isempty( varargin{3} )
-                    mask_ = varargin{3}(y_1:y_2, x_1:x_2 );
-                    s_grade = sum(mask_, 'all') / (bbox_prediction(3)*bbox_prediction(4) );
-                end
-                %             frame = varargin{4};
-                %             test with harris feauture
-                %             figure; imshow(frame(y_1:y_2, x_1:x_2 ));
-                %             a = detectHarrisFeatures(rgb2gray(frame(y_1:y_2, x_1:x_2, : )));
-                %             hold on; plot(a);
-                %
-                % now use grades to validate it
-                % if it is enough save it to known
-                if (f_grade > 0.3 | hsv_grade > 0.03 | s_grade > 0.3)  %#ok<OR2>
-                    % update the bbox
-                    obj.bbox{end} = bbox_prediction(1, :);
-                    obj.image_coordinate{end} = [ (x_1+x_2)/2, (y_1+y_2)/2 ];
-                    obj.state{end} = "known";
-                    obj.total_visible_count = obj.total_visible_count +1;
-                    obj.consecutive_invisible = 0;
-                    return;
-                end
-            end
-            % if I haven't svaed my prediction, let's look at the proposed
-            % bboxes
-            max_ = [0, 0];
-            bbox_prediction = varargin{5};
-            for idx = 1:size( bbox_prediction, 1)
-                y_1 = bbox_prediction(idx, 2);
-                x_1 = bbox_prediction(idx, 1);
-                y_2 = y_1 + bbox_prediction(idx, 4)-1;
-                x_2 = x_1 + bbox_prediction(idx, 3)-1;
+                % for every of them, compute J
+                x = obj.J_values( f_set, h_set, s_set );
+                lambda = [1, 1, 1, 1, 1];
+                J = lambda * x';
                 
-                % let's start that I know the order of the 3 mask
-                % I don't need f_mask anymore
-                if ~isempty( varargin{2} )
-                    mask_ = varargin{2}(y_1:y_2, x_1:x_2 );
-                    hsv_grade = sum(~mask_, 'all') / (bbox_prediction(3)*bbox_prediction(4) );
-                end
-                if ~isempty( varargin{3} )
-                    mask_ = varargin{3}(y_1:y_2, x_1:x_2 );
-                    s_grade = sum(~mask_, 'all') / (bbox_prediction(3)*bbox_prediction(4) );
-                end
-                distance = norm( obj.image_coordinate{end-1}- [ (x_1+x_2)/2, (y_1+y_2)/2 ] );
-                area_increase = obj.bbox{end-1};
-                area_increase = area_increase(3)*area_increase(4)/  (bbox_prediction(3)*bbox_prediction(4) );
-                %             frame = varargin{4};
-                %             test with harris feauture
-                %             figure; imshow(frame(y_1:y_2, x_1:x_2 ));
-                %             a = detectHarrisFeatures(rgb2gray(frame(y_1:y_2, x_1:x_2, : )));
-                %             hold on; plot(a);
-                %
-                % now use grades to validate it (object function to tune
+                % take min J idx
+                [~, n] = min( J ) ;
                 
-                grade =  0.1*hsv_grade + 0.01*distance ; % + distance from last
-                if grade > max_(2)
-                    max_(1) = idx;
-                    max_(2) = grade;
-                end
-                
-            end
-            
-            if max_(1) == 0 | max_(2) < 0.3
-                % no one has passed the test discard prediction if total
-                % invisible less then param setted in class
-                obj = obj.discard_last();
-                return;
-            else
-                % save
-                obj.bbox{end} = bbox_prediction(idx, :);
-                obj.image_coordinate{end} = [ (x_1+x_2)/2, (y_1+y_2)/2 ];
-                obj.state{end} = "known";
-                obj.total_visible_count = obj.total_visible_count +1;
+                % assign it to obj.ball
+                obj.image_coordinate{ end } = f_set.centers{ n };
+                obj.radii{ end } = f_set.radii{ n };
+                obj.bbox{ end } = ...
+                    [ floor( f_set.centers{ n } - f_set.radii{ n } ), ...
+                    2*ceil( [f_set.radii{ n }, f_set.radii{ n }] )];
+                obj.state{ end } = "known";
+                obj.total_visible_count = obj.total_visible_count + 1;
                 obj.consecutive_invisible = 0;
-                return;
             end
             
             
@@ -214,6 +149,78 @@ classdef history_tracker
                 obj.state{end} = "unknown";
                 obj.consecutive_invisible = 1;
             end
+        end
+        
+        function set_ = select_strongest( obj, set , quantity )
+            distances = zeros( set.length, 1);
+            for idx = 1: set.length
+                distances( idx ) = norm( obj.image_coordinate{end} - set.centers{ idx, : } ) ;
+            end
+            
+            set_.length = min( quantity, set.length ) ;
+            set_.centers = cell( set_.length, 1);
+            set_.radii = cell( set_.length, 1);
+            set_.d_prev = cell( set_.length, 1);
+            set_.mask = set.mask;
+            for idx = 1: set_.length
+                [m, n] = min( distances );
+                
+                %copy
+                set_.centers{ idx } = set.centers{ n, : };
+                set_.radii{ idx } = set.radii{ n };
+                set_.d_prev{ idx } = m;
+                
+                % remove the used one
+                distances( n ) = max( distances) ;
+            end
+        end
+        
+        function x = J_values( obj, f_set, h_set, s_set )
+            % x1
+            distances_from_old = zeros( f_set.length, 1);
+            for idx = 1: f_set.length
+                distances_from_old( idx ) = norm( obj.image_coordinate{ end-1 } - f_set.centers{ idx, : } ) ;
+            end
+            
+            % x2
+            distance_from_prev = zeros( f_set.length, 1);
+            for idx = 1: f_set.length
+                distance_from_prev( idx ) = f_set.d_prev{ idx } ;
+            end
+            
+            % x3
+            d_ratio = zeros( f_set.length, 1);
+            for idx = 1: f_set.length
+                d_ratio( idx ) = f_set.radii{ idx } / obj.radii{ end-1 };
+            end
+            
+            % x4
+            max_d = 15;
+            %min between 2*ma_d and actual distance from the closest circle
+            %found in s_mask
+            distance_from_s = zeros( f_set.length, 1);
+            for idx = 1: f_set.length
+                d_f_s_jdx = norm( f_set.centers{ idx, : } - s_set.centers{ 1 } );
+                distance_from_s( idx ) = min( d_f_s_jdx, 2*max_d ) ;
+                
+                for jdx = 2: size( s_set.centers, 1 )
+                    d_f_s_jdx = norm( f_set.centers{ idx, : } - s_set.centers{ jdx } );
+                    d_f_s_idx = distance_from_s( idx );
+                    distance_from_s( idx ) = ...
+                        min( [d_f_s_idx, d_f_s_jdx, 2*max_d] );
+                end
+            end
+            
+            % x5
+            color_ratio = zeros( f_set.length, 1);
+            for idx = 1: f_set.length
+                bboxes( 1:2 ) = floor( f_set.centers{ idx } - f_set.radii{ idx } );
+                bboxes( 3:4 ) = 2*ceil( [f_set.radii{ idx }, f_set.radii{ idx }] );
+                temp = h_set.mask( bboxes(2):bboxes(2)+bboxes(4), bboxes(1):bboxes(1)+bboxes(3) );
+                color_ratio(idx) = 1 - sum( temp, 'all' )/( bboxes(3)*bboxes(4) );
+            end
+            
+            x = [ distances_from_old, distance_from_prev, d_ratio, distance_from_s, color_ratio ];
         end
     end
 end

@@ -53,12 +53,13 @@ while hasFrame(obj.video_reader)
         
     %analysis to perfrom when the action is on
     elseif obj.is_tracking()
-        [centroids, bboxes, f_mask] = obj.foreground_analysis( frame);
-        [hsv_mask] = obj.hsv_analysis( frame);
-        [s_mask] = obj.step_analysis( frame );
+        [f_prop] = obj.foreground_analysis( frame);
+        [h_prop] = obj.hsv_analysis( frame);
+        [s_prop] = obj.step_analysis( frame );
         
         obj.ball = obj.ball.predict_location(frame);
         %last one is the predicted
+        
 %         if count == 834
 %             close all
 %             figure, imshow(frame); hold on; rectangle('Position', obj.ball.bbox{end}, 'EdgeColor', 'yellow'); hold off;
@@ -70,7 +71,7 @@ while hasFrame(obj.video_reader)
 %             figure, imshow(s_mask);[centers, radii] = imfindcircles(s_mask, [3, 15]); [~] = viscircles(centers,radii);
 %         end
         % now let's see if it make sens to make it known
-        % obj.ball = obj.ball.assignment( f_mask, hsv_mask, s_mask, frame, bboxes );
+         obj.ball = obj.ball.assignment( f_prop, h_prop, s_prop );
         
     end
     
@@ -80,7 +81,8 @@ while hasFrame(obj.video_reader)
     % referee has whistle again, ball has touched ground
     if count == 865
         obj = obj.end_action();
-    end
+        return ;
+    end 
 end
 
 
