@@ -12,6 +12,7 @@ classdef history_tracker
         consecutive_invisible;
         length;
         starting_side;
+        kf
     end
     
     methods
@@ -105,7 +106,7 @@ classdef history_tracker
             obj.consecutive_invisible = obj.consecutive_invisible + 1;
         end
         
-        % da fare forte
+        % ok first version
         function obj = assignment(  obj, varargin )
             if strcmp( obj.state{end}, "known" )
                 return;
@@ -114,11 +115,13 @@ classdef history_tracker
             %total visible count and set to 0 consecutive invisible
             
             if strcmp( obj.state{end}, "predicted" )
+                debug = 0;
                 f_set = varargin{1};
                 h_set = varargin{2};
                 s_set = varargin{3};
-                % get the n closest to prediction,
-                f_set = obj.select_strongest( f_set, 10 );
+                % get the n  closest to prediction,
+                n = 10;
+                f_set = obj.select_strongest( f_set, n );
                 
                 % for every of them, compute J
                 x = obj.J_values( f_set, h_set, s_set );
@@ -127,6 +130,15 @@ classdef history_tracker
                 
                 % take min J idx
                 [~, n] = min( J ) ;
+                
+                if debug
+                    figure; imshow(f_set.mask); hold on
+                    viscircles( cell2mat(f_set.centers), cell2mat(f_set.radii), 'Color', 'red' );
+                    viscircles( cell2mat(s_set.centers), cell2mat(s_set.radii), 'Color', 'yellow' );
+                    viscircles( obj.image_coordinate{ end }, obj.radii{ end } , 'Color', 'green' );
+                    figure; imshow(h_set.mask);
+                    figure; imshow(s_set.mask);
+                end
                 
                 % assign it to obj.ball
                 obj.image_coordinate{ end } = f_set.centers{ n };
@@ -137,6 +149,8 @@ classdef history_tracker
                 obj.state{ end } = "known";
                 obj.total_visible_count = obj.total_visible_count + 1;
                 obj.consecutive_invisible = 0;
+                
+                
             end
             
             
