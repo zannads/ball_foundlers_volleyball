@@ -14,6 +14,8 @@ classdef frame_analyser
         ball = [];
         
         old_frame = [];
+        
+        debug = 0;
     end
     
     
@@ -43,8 +45,10 @@ classdef frame_analyser
             % of 1 corresponds to the foreground and the value of 0 corresponds
             % to the background.
             
-            obj.f_detector = vision.ForegroundDetector('NumGaussians', 3, ...
-                'NumTrainingFrames', 500, 'MinimumBackgroundRatio', 0.7);
+%             obj.f_detector = vision.ForegroundDetector('NumGaussians', 3, ...
+%                 'NumTrainingFrames', 500, 'MinimumBackgroundRatio', 0.7);
+            obj.f_detector = vision.ForegroundDetector('NumGaussians', 5, ...
+                'AdaptLearningRate', 0, 'MinimumBackgroundRatio', 0.7);
             
             % Connected groups of foreground pixels are likely to correspond to moving
             % objects.  The blob analysis System object is used to find such groups
@@ -55,28 +59,30 @@ classdef frame_analyser
                 'AreaOutputPort', true, 'CentroidOutputPort', true, ...
                 'MinimumBlobArea', 400, 'MaximumBlobArea', 800);
             
-            start_image = imread( '/Users/denniszanutto/Downloads/start_image.jpg');
-            start_image_hsv = rgb2hsv(start_image);
-            ball_starting_region = [290, 190, 16, 16];
-            % using hsv tracking I create the object histogram
-            obj.h_tracker = vision.HistogramBasedTracker;
-            initializeObject(obj.h_tracker, start_image_hsv(:,:,1) , ball_starting_region);
-            
+%             start_image = imread( '/Users/denniszanutto/Downloads/start_image.jpg');
+%             start_image_hsv = rgb2hsv(start_image);
+%             ball_starting_region = [290, 190, 16, 16];
+%             % using hsv tracking I create the object histogram
+%             obj.h_tracker = vision.HistogramBasedTracker;
+%             initializeObject(obj.h_tracker, start_image_hsv(:,:,1) , ball_starting_region);
+%             
             
             % using difference between frames
-            obj.block_matcher = vision.BlockMatcher('ReferenceFrameSource',...
-                'Input port','BlockSize',[720 1280]);
-            obj.block_matcher.OutputValue = 'Horizontal and vertical components in complex form';
-            
+%             obj.block_matcher = vision.BlockMatcher('ReferenceFrameSource',...
+%                 'Input port','BlockSize',[720 1280]);
+%             obj.block_matcher.OutputValue = 'Horizontal and vertical components in complex form';
+%             
             % template matching for start of the action
-            obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
-                'BestMatchNeighborhoodOutputPort', true);
-            
+%             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
+%                 'BestMatchNeighborhoodOutputPort', true);
+%             
             % I'll create the object whnen I hear the whistle, doen't make
             % sense to track i out of the actions
             obj.ball = [];
             
             obj.old_frame = [];
+            
+            obj.debug = 1;
         end
         
         %% Foreground Analysis
@@ -129,21 +135,23 @@ classdef frame_analyser
         end
         
         function [set] = foreground_analysis( obj, frame)
-            
+            l_r = 0.000000001;
             % Detect foreground and build the struct.
-            mask = obj.f_detector.step(frame);
+            mask = obj.f_detector.step(frame, l_r);
             
             % Apply morphological operations to remove noise and fill in holes.
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            set = arrange_prop( mask );          
+            set = obj.arrange_prop( mask );
+            set.mask = mask;
         end
         
-        function [obj] = learn_background( obj, frame )
+        function [mask] = learn_background( obj, frame )
             % Detect foreground.
-            [~] = obj.f_detector.step(frame);
+            l_r = 0.005;
+            [mask] = obj.f_detector.step(frame, l_r);
         end
         
         function [set] = hsv_analysis ( obj, frame )
@@ -158,7 +166,9 @@ classdef frame_analyser
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            set = arrange_prop( mask );
+            % I think I can remove it from here
+            set = obj.arrange_prop( mask );
+            set.mask = mask;
             % bbox = obj.h_tracker( hsv_frame(:,:,1) ); %#ok<NASGU>
         end
         
@@ -169,7 +179,8 @@ classdef frame_analyser
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            set = arrange_prop( mask );
+            set = obj.arrange_prop( mask );
+            set.mask = mask;
             %motion = obj.block_matcher( frame, obj.old_frame ); %#ok<NASGU>
         end
         
@@ -178,19 +189,20 @@ classdef frame_analyser
             obj.old_frame = frame;
         end
         
-        function obj = start_action( obj , frame )
+        function obj = start_action( obj , frame, starting_side,  x, y)
             % when the referee whistle the action begins
             % Iìd like to use the template matcher, to find the first
             % instance of the ball.
             % now I just select it
+            obj.ball.starting_side = starting_side;
             obj.ball = history_tracker();
             
             if( obj.ball.starting_side == 0 ) % it's on the far side
                 %it should be visible
                 
                 % known info for now it is okay
-                x = [839, 853];
-                y = [29, 43];
+                %                 x = [839, 853];
+                %                 y = [29, 43];
                 
                 obj.ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
                 obj.ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
@@ -225,13 +237,24 @@ classdef frame_analyser
             %save it
         end
         
-        function obj = display_tracking( obj, frame )
-            obj = obj.update_old(frame);
-            
+        function obj = display_tracking( obj, frame, varargin )
             if( ~isempty( obj.ball ) & ~isempty( obj.ball.bbox{end} ) )
                 frame = insertObjectAnnotation(frame, 'rectangle', ...
                     obj.ball.bbox{end}, obj.ball.state{end});
                 
+                if obj.debug & nargin > 2
+                    f_prop = varargin{1};
+                    s_prop = varargin{2};
+                    if s_prop.length > 0
+                    frame = insertObjectAnnotation(frame, 'circle', ...
+                        [cell2mat(s_prop.centers), cell2mat(s_prop.radii)], "s", 'Color', 'red');
+                    end
+                    if f_prop.length > 0
+                    frame = insertObjectAnnotation(frame, 'circle', ...
+                        [cell2mat(f_prop.centers), cell2mat(f_prop.radii)], "f", 'Color', 'green');
+                    end
+                    
+                end
                 % Draw the objects on the mask.
                 %                 mask = insertObjectAnnotation(mask, 'rectangle', ...
                 %                     bboxes, label);
@@ -243,6 +266,34 @@ classdef frame_analyser
         
         function out_ = is_tracking( obj )
             out_ = ~isempty( obj.ball );
+        end
+        
+        function set_ = arrange_prop( obj, mask  )
+            %set_.mask = mask;
+            [mask, v_x, v_y] = obj.extract_roi( mask );
+            radius = obj.ball.radii{end};
+            [centers, radii] = imfindcircles(mask, [floor(0.5*radius), ceil(1.5*radius)]);
+            
+            set_.length = size( centers, 1);
+            set_.centers = cell( set_.length, 1 );
+            set_.radii = cell( set_.length, 1 );
+            for idx = 1:size( centers, 1)
+                set_.centers{idx} = centers( idx, : ) + [v_x, v_y];
+                set_.radii{idx} = radii( idx, : );
+            end
+        end
+        
+        function [roi_mask, v_x, v_y] = extract_roi( obj, mask )
+            x_y = obj.ball.image_coordinate{end};
+            
+            x_1 = max( floor( x_y(1) -100 ), 1 );        % leftmost point
+            y_1 = max( floor( x_y(2) -100 ), 1 );        % leftmost point
+            x_2 = min( floor( x_y(1) +100 ), size(mask, 2) );        % leftmost point
+            y_2 = min( floor( x_y(2) +100 ), size(mask, 1) );        % leftmost point
+            
+            roi_mask = mask( y_1:y_2, x_1:x_2 );
+            v_x = x_1;
+            v_y = y_1;
         end
     end
 end

@@ -166,7 +166,7 @@ end
         
         % Detect foreground.
         mask = obj.detector.step(frame);
-        
+        detector = obj.detector;
         % Apply morphological operations to remove noise and fill in holes.
         mask = imopen(mask, strel('rectangle', [3,3]));
         mask = imclose(mask, strel('rectangle', [15, 15])); 

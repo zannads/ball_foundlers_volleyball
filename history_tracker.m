@@ -12,7 +12,12 @@ classdef history_tracker
         consecutive_invisible;
         length;
         starting_side;
-        kf
+        
+        speed;
+        
+        prediction_coordinate;
+        prediction_radii;
+        k_step;
     end
     
     methods
@@ -27,6 +32,10 @@ classdef history_tracker
             obj.total_visible_count = 0;
             obj.consecutive_invisible = 0;
             obj.starting_side = 0;
+            obj.speed = [0, 0];
+%             obj.k_step = 3;
+%             obj.prediction_coordinate{obj.k_step} = [];
+%             obj.prediction_radii{obj.k_step} = [];
         end
         
         % ok add, mai usata
@@ -53,17 +62,17 @@ classdef history_tracker
         function obj = predict_location( obj , frame ) %#ok<INUSD>
             % se il precedente è unknown
             % chiedi punt
-            if strcmp ( obj.state{end} , "unknown" )
-                %acquire pts from image
-                % set to known
-                % length = +1
-                
-                return;
-            end
+            %             if strcmp ( obj.state{end} , "unknown" )
+            %                 %acquire pts from image
+            %                 % set to known
+            %                 % length = +1
+            %
+            %                 return;
+            %             end
             
             % se il precedente è known o predicted
             % se il pre preceente è unknown o non esiste
-            %same point
+            % same point
             if obj.length == 1 | strcmp ( obj.state{end-1}, "unknown" )
                 % repeat the same point
                 % set to predicted
@@ -82,14 +91,18 @@ classdef history_tracker
             % altrimenti
             %liinear interp
             
+            d_t = 1/25;
             current.radii = obj.radii{end};
             current.bbox = obj.bbox{end};
             current.image_coordinate = obj.image_coordinate{end};
-            previous.bbox = obj.bbox{end};
-            previous.image_coordinate = obj.image_coordinate{end};
+            
+            previous.bbox = obj.bbox{end-1};
+            previous.image_coordinate = obj.image_coordinate{end-1};
             
             %costant speed costant direction
-            obj.image_coordinate{end+1} = current.image_coordinate + (current.image_coordinate - previous.image_coordinate);
+            %obj.image_coordinate{end+1} = current.image_coordinate + (current.image_coordinate - previous.image_coordinate);
+            obj.image_coordinate{end+1} = current.image_coordinate + obj.speed*d_t;
+            
             % skip for now
             %out_.hsv_scale
             % dimension constant scaling wrt to previous area
@@ -99,6 +112,7 @@ classdef history_tracker
             new_top = current.bbox(1:2) - ceil ((new_area-current.bbox(3:4))/2) ;
             
             obj.radii{end +1} = current.radii*A_1/A_2;
+            %obj.radii{end +1} = current.radii^2/previous.radii;
             obj.bbox{end+1} = [new_top, new_area] ;
             obj.state{end+1} = "predicted";
             obj.length = obj.length + 1;
@@ -115,42 +129,37 @@ classdef history_tracker
             %total visible count and set to 0 consecutive invisible
             
             if strcmp( obj.state{end}, "predicted" )
-                debug = 0;
+               
                 f_set = varargin{1};
                 h_set = varargin{2};
                 s_set = varargin{3};
+                
                 % get the n  closest to prediction,
                 n = 10;
-                f_set = obj.select_strongest( f_set, n );
+                v_set = obj.select_strongest( n, f_set, s_set);
                 
                 % for every of them, compute J
-                x = obj.J_values( f_set, h_set, s_set );
-                lambda = [1, 1, 1, 1, 1];
+                x = obj.J_values( v_set, h_set );
+                lambda = [1, 30];
                 J = lambda * x';
                 
                 % take min J idx
                 [~, n] = min( J ) ;
                 
-                if debug
-                    figure; imshow(f_set.mask); hold on
-                    viscircles( cell2mat(f_set.centers), cell2mat(f_set.radii), 'Color', 'red' );
-                    viscircles( cell2mat(s_set.centers), cell2mat(s_set.radii), 'Color', 'yellow' );
-                    viscircles( obj.image_coordinate{ end }, obj.radii{ end } , 'Color', 'green' );
-                    figure; imshow(h_set.mask);
-                    figure; imshow(s_set.mask);
-                end
+               
                 
                 % assign it to obj.ball
-                obj.image_coordinate{ end } = f_set.centers{ n };
-                obj.radii{ end } = f_set.radii{ n };
+                obj.image_coordinate{ end } = v_set.centers{ n };
+                obj.radii{ end } = v_set.radii{ n };
                 obj.bbox{ end } = ...
-                    [ floor( f_set.centers{ n } - f_set.radii{ n } ), ...
-                    2*ceil( [f_set.radii{ n }, f_set.radii{ n }] )];
+                    [ floor( v_set.centers{ n } - v_set.radii{ n } ), ...
+                    2*ceil( [v_set.radii{ n }, v_set.radii{ n }] )];
                 obj.state{ end } = "known";
                 obj.total_visible_count = obj.total_visible_count + 1;
                 obj.consecutive_invisible = 0;
                 
-                
+                r = 0.8;
+                obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
             end
             
             
@@ -165,76 +174,135 @@ classdef history_tracker
             end
         end
         
-        function set_ = select_strongest( obj, set , quantity )
-            distances = zeros( set.length, 1);
-            for idx = 1: set.length
-                distances( idx ) = norm( obj.image_coordinate{end} - set.centers{ idx, : } ) ;
-            end
+        function set_ = select_strongest( obj, quantity, varargin  )
+            % allocate set_
+            set_.length = 0;
+            set_.centers = {};
+            set_.radii = {};
+            set_.d_prev = {};
+            set_.connect = {};  % idx of s_set where it is connected to
             
-            set_.length = min( quantity, set.length ) ;
-            set_.centers = cell( set_.length, 1);
-            set_.radii = cell( set_.length, 1);
-            set_.d_prev = cell( set_.length, 1);
-            set_.mask = set.mask;
-            for idx = 1: set_.length
-                [m, n] = min( distances );
-                
-                %copy
-                set_.centers{ idx } = set.centers{ n, : };
-                set_.radii{ idx } = set.radii{ n };
-                set_.d_prev{ idx } = m;
-                
-                % remove the used one
-                distances( n ) = max( distances) ;
-            end
-        end
-        
-        function x = J_values( obj, f_set, h_set, s_set )
-            % x1
-            distances_from_old = zeros( f_set.length, 1);
-            for idx = 1: f_set.length
-                distances_from_old( idx ) = norm( obj.image_coordinate{ end-1 } - f_set.centers{ idx, : } ) ;
-            end
-            
-            % x2
-            distance_from_prev = zeros( f_set.length, 1);
-            for idx = 1: f_set.length
-                distance_from_prev( idx ) = f_set.d_prev{ idx } ;
-            end
-            
-            % x3
-            d_ratio = zeros( f_set.length, 1);
-            for idx = 1: f_set.length
-                d_ratio( idx ) = f_set.radii{ idx } / obj.radii{ end-1 };
-            end
-            
-            % x4
-            max_d = 15;
-            %min between 2*ma_d and actual distance from the closest circle
-            %found in s_mask
-            distance_from_s = zeros( f_set.length, 1);
-            for idx = 1: f_set.length
-                d_f_s_jdx = norm( f_set.centers{ idx, : } - s_set.centers{ 1 } );
-                distance_from_s( idx ) = min( d_f_s_jdx, 2*max_d ) ;
-                
-                for jdx = 2: size( s_set.centers, 1 )
-                    d_f_s_jdx = norm( f_set.centers{ idx, : } - s_set.centers{ jdx } );
-                    d_f_s_idx = distance_from_s( idx );
-                    distance_from_s( idx ) = ...
-                        min( [d_f_s_idx, d_f_s_jdx, 2*max_d] );
+            % first one should be f_set
+            f_set = varargin{1};
+            if f_set.length
+                distances = zeros( f_set.length, 1);
+                for idx = 1: f_set.length
+                    distances( idx ) = norm( obj.image_coordinate{end} - f_set.centers{ idx, : } ) ;
+                end
+               
+                set_.length = min( quantity, f_set.length ) ;
+                set_.centers{ set_.length, 1} = 0;
+                set_.radii { set_.length, 1} = 0;
+                set_.d_prev{ set_.length, 1} = 0;
+                set_.connect{ set_.length, 1} = 0;
+                idx = 1;
+                max_ = max( distances) +1;
+                while idx <= set_.length
+                    [m, n] = min( distances );
+                    
+                    %copy
+                    set_.centers{ idx } = f_set.centers{ n, : };
+                    set_.radii{ idx } = f_set.radii{ n };
+                    set_.d_prev{ idx } = m;
+                    set_.connect{ idx } = 0;
+                    
+                    % remove the used one
+                    distances( n ) = max_ ;
+                    idx = idx+1;
                 end
             end
             
+            % second one is s_set
+            % I compute the distance of every of these circles to the
+            % ones of f_set i  close eneough
+            s_set = varargin{2};
+            if s_set.length
+                distances = zeros( set_.length, s_set.length);
+                for jdx = 1:s_set.length
+                    for idx = 1: set_.length
+                        distances( idx, jdx ) = norm( s_set.centers{ jdx } - set_.centers{ idx, : } ) ;
+                    end
+                end
+                
+                kdx = min( set_.length, s_set.length ) ;
+                numbers = 1:s_set.length;
+                while kdx > 0 % and dim less then n
+                    [m, n] = min( distances , [], 'all', 'linear');
+                    if m <= 2*obj.radii{ end }
+                        r = ceil( n/s_set.length ) ; 
+                        c = n- (r-1)*s_set.length ;
+                        
+                        
+                        set_.connect{ r} = numbers(c);
+                        numbers(c) = [];
+                        
+                        distances(r, :) = [];
+                        distances(:, c) = [];
+                        
+                        
+                        s_set.length = s_set.length -1;
+                        s_set.centers(c, :) = [];
+                        s_set.radii(c, :) = [];
+                    end
+                    
+                    kdx = kdx-1;
+                end
+                
+                % If I still have some circles not been asigned I add the
+                % m to f_set
+                if s_set.length
+                    distances = zeros( s_set.length, 1);
+                    for idx = 1: s_set.length
+                        distances( idx ) = norm( obj.image_coordinate{end} - s_set.centers{ idx, : } ) ;
+                    end
+                    
+                    idx = set_.length+1;
+                    set_.length = set_.length + min( quantity, s_set.length ) ;
+                    set_.centers{ set_.length, 1} = 0;
+                    set_.radii { set_.length, 1} = 0;
+                    set_.d_prev{ set_.length, 1} = 0;
+                    set_.strength{ set_.length, 1} = 0;
+
+                    max_ = max( distances) +1;
+                    while idx <= set_.length
+                        [m, n] = min( distances );
+                        
+                        %copy
+                        set_.centers{ idx } = s_set.centers{ n, : };
+                        set_.radii{ idx } = s_set.radii{ n };
+                        set_.d_prev{ idx } = m;
+                        set_.strength{ idx } = 1;
+                        
+                        % remove the used one
+                        distances( n ) = max_ ;
+                        idx = idx+1;
+                    end
+                end
+                    
+            end
+            
+        end
+        
+        function x = J_values( obj, v_set, h_set )
+            
+            % x1
+            %             distance_from_prev = zeros( v_set.length, 1);
+            %             for idx = 1: v_set.length
+            %                 distance_from_prev( idx ) = v_set.d_prev{ idx } ;
+            %             end
+            distance_from_prev = cell2mat( v_set.d_prev );
+            
             % x5
-            color_ratio = zeros( f_set.length, 1);
-            for idx = 1: f_set.length
-                bboxes( 1:2 ) = floor( f_set.centers{ idx } - f_set.radii{ idx } );
-                bboxes( 3:4 ) = 2*ceil( [f_set.radii{ idx }, f_set.radii{ idx }] );
+            color_ratio = zeros( v_set.length, 1);
+            for idx = 1: v_set.length
+                bboxes( 1:2 ) = floor( v_set.centers{ idx } - v_set.radii{ idx } );
+                bboxes( 3:4 ) = 2*ceil( [v_set.radii{ idx }, v_set.radii{ idx }] );
+                % attention with the indices if they go below 0
                 temp = h_set.mask( bboxes(2):bboxes(2)+bboxes(4), bboxes(1):bboxes(1)+bboxes(3) );
                 color_ratio(idx) = 1 - sum( temp, 'all' )/( bboxes(3)*bboxes(4) );
             end
             
-            x = [ distances_from_old, distance_from_prev, d_ratio, distance_from_s, color_ratio ];
+            x = [ distance_from_prev, color_ratio ];
         end
     end
 end

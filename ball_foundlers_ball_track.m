@@ -30,64 +30,54 @@
 
 obj = frame_analyser();
 
-count = 0;
+count = 1;
 % Detect moving objects, and track them across video frames.
-while hasFrame(obj.video_reader)
-    %%%%%%
-    % just to skip the begninning and go where the match starts
-    count = count+1;
-    if( count == 500+1)
-        obj.video_reader.CurrentTime = 130;
+while count < 800+1
+    if ~ mod( count, 100 )
+        disp( "Learning backgorund" );
     end
-    %%%%%
- 
     frame = readFrame(obj.video_reader);
-    if ( count < (500+1) )
-        obj = obj.learn_background(frame);
-    end
     
-    %starting moment of the first action
-    % i should listen to whistle
-    if count == 834
-        obj = obj.start_action( frame );
-        
-    %analysis to perfrom when the action is on
-    elseif obj.is_tracking()
-        [f_prop] = obj.foreground_analysis( frame);
-        [h_prop] = obj.hsv_analysis( frame);
-        [s_prop] = obj.step_analysis( frame );
-        
-        obj.ball = obj.ball.predict_location(frame);
-        %last one is the predicted
-        
-%         if count == 834
-%             close all
-%             figure, imshow(frame); hold on; rectangle('Position', obj.ball.bbox{end}, 'EdgeColor', 'yellow'); hold off;
-%             figure, imshow(f_mask); hold on; rectangle('Position', obj.ball.bbox{end}, 'EdgeColor', 'yellow'); hold off;
-%             figure, imshow(hsv_mask); hold on; rectangle('Position', obj.ball.bbox{end}, 'EdgeColor', 'yellow'); hold off;
-%             figure, imshow(s_mask); hold on; rectangle('Position', obj.ball.bbox{end}, 'EdgeColor', 'yellow'); hold off;
-%             figure, imshow(f_mask);[centers, radii] = imfindcircles(f_mask, [3, 15]); [~] = viscircles(centers,radii);
-%             figure, imshow(hsv_mask);[centers, radii] = imfindcircles(hsv_mask, [3, 15]); [~] = viscircles(centers,radii);
-%             figure, imshow(s_mask);[centers, radii] = imfindcircles(s_mask, [3, 15]); [~] = viscircles(centers,radii);
-%         end
-        % now let's see if it make sens to make it known
-         obj.ball = obj.ball.assignment( f_prop, h_prop, s_prop );
-        
-    end
-    
-    % display video
-    obj = obj.display_tracking( frame );
-    
-    % referee has whistle again, ball has touched ground
-    if count == 865
-        obj = obj.end_action();
-        return ;
-    end 
+    mask = obj.learn_background(frame);
+    count = count+1;
 end
 
 
+%%
+actions = load( 'actions.mat' );
 
+% for actions
 
+%starting moment of the first action
+    % I should listen to whistle
+%count = actions.action_1.starting_frame;
+
+obj.video_reader.CurrentTime = actions.action_1.starting_time;
+frame = readFrame(obj.video_reader);
+obj = obj.start_action( frame , actions.action_1.starting_side, actions.action_1.position_x, actions.action_1.position_y);
+obj = obj.update_old( frame );
+obj = obj.display_tracking( frame );
+
+while( obj.video_reader.CurrentTime <= actions.action_1.ending_time )
+    frame = readFrame(obj.video_reader);
+    
+    %analysis to perfrom when the action is on
+    
+    [f_prop] = obj.foreground_analysis( frame );
+    [h_prop] = obj.hsv_analysis( frame );
+    [s_prop] = obj.step_analysis( frame );
+    
+    obj.ball = obj.ball.predict_location(frame);
+    %last one is the predicted
+    
+    obj.ball = obj.ball.assignment( f_prop, h_prop, s_prop );
+    
+    obj = obj.update_old(frame);
+    % display video
+    obj = obj.display_tracking( frame , f_prop, s_prop);
+end
+% referee has whistle again, ball has touched ground
+obj = obj.end_action();
 
 
 
