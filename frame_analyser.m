@@ -165,7 +165,9 @@ classdef frame_analyser
             %set_.mask = mask;
             [mask, v_x, v_y] = obj.extract_roi( mask, last_known.position );
             radius = last_known.radii;
-            [centers, radii] = imfindcircles(mask, [floor(0.5*radius), ceil(1.5*radius)]);
+            m_r = min( max( floor(0.5*radius), 3), 10) ;
+            M_r = max( min( ceil(1.5*radius), 15), 5);
+            [centers, radii] = imfindcircles(mask, [m_r, M_r]);
             
             set_.length = size( centers, 1);
             set_.centers = cell( set_.length, 1 );

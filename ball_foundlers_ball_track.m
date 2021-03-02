@@ -25,15 +25,17 @@
 % don't care. If I'll be good enough I'll complete the trajectories.
 
 %%
-
+a_h = actions_handler( cd, 'actions.mat');
 v_h = video_handler();
 f_a = frame_analyser();
 
+v_h.reader.CurrentTime = (a_h.training_frames(1)-1)/v_h.reader.FrameRate;
+
 count = 1;
 
-while count < 800+1
+while v_h.reader.CurrentTime < a_h.training_frames(2)/v_h.reader.FrameRate
     if ~ mod( count, 100 )
-        disp( "Learning backgorund" );
+        disp( "Learning background" );
     end
     v_h.frame = readFrame(v_h.reader);
     
@@ -43,40 +45,39 @@ end
 
 
 %%
-actions = load( 'actions.mat' );
-
-% for actions
 
 %starting moment of the first action
-    % I should listen to whistle
-%count = actions.action_1.starting_frame;
-
-v_h.reader.CurrentTime = actions.action_1.starting_time;
-v_h = v_h.next_frame();
-
-ball = v_h.start_action( actions.action_1.starting_side, actions.action_1.position_x, actions.action_1.position_y);
-v_h = v_h.display_tracking( ball );
-
-while( v_h.reader.CurrentTime <= actions.action_1.ending_time )
+% I should listen to whistle
+for idx = 1:a_h.total
+    
+    current = a_h.next();
+    
+    v_h.reader.CurrentTime = current.starting_time;
     v_h = v_h.next_frame();
     
-    %analysis to perfrom when the action is on
-    last_known.position = ball.image_coordinate{end};
-    last_known.radii = ball.radii{end};
-    [f_prop] = f_a.foreground_analysis( v_h.frame, last_known );
-    [h_prop] = f_a.hsv_analysis( v_h.frame, last_known );
-    [s_prop] = f_a.step_analysis( v_h.frame, v_h.old_frame{1}, last_known );
+    ball = v_h.start_action( current.starting_side, current.position_x, current.position_y);
+    v_h = v_h.display_tracking( ball );
     
-    ball = ball.predict_location( v_h.frame );
-    %last one is the predicted
-    
-    ball = ball.assignment( f_prop, h_prop, s_prop );
-    
-    % display video
-    v_h = v_h.display_tracking( ball, f_prop, s_prop);
+    while( v_h.reader.CurrentTime <= current.ending_time )
+        v_h = v_h.next_frame();
+        
+        %analysis to perfrom when the action is on
+        last_known.position = ball.image_coordinate{end};
+        last_known.radii = ball.radii{end};
+        [f_prop] = f_a.foreground_analysis( v_h.frame, last_known );
+        [h_prop] = f_a.hsv_analysis( v_h.frame, last_known );
+        [s_prop] = f_a.step_analysis( v_h.frame, v_h.old_frame{1}, last_known );
+        
+        ball = ball.predict_location( v_h.frame );
+        %last one is the predicted
+        
+        ball = ball.assignment( f_prop, h_prop, s_prop );
+        
+        % display video
+        v_h = v_h.display_tracking( ball, f_prop, s_prop);
+    end
+    % referee has whistle again, ball has touched ground
+    v_h = v_h.end_action();
 end
-% referee has whistle again, ball has touched ground
-v_h = v_h.end_action();
-
 
 
