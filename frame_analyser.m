@@ -1,19 +1,13 @@
 classdef frame_analyser
-    %UNTITLED5 Summary of this class goes here
+    %FRAME_ANALYSER Summary of this class goes here
     %   Detailed explanation goes here
     
     properties
-        video_reader = [];
-        video_player = [];
-        mask_player = [];
         f_detector = [];
         blob_analyser = [];
         h_tracker = [];
         block_matcher = [];
         template_matcher = [];
-        ball = [];
-        
-        old_frame = [];
         
         debug = 0;
     end
@@ -26,17 +20,6 @@ classdef frame_analyser
         % taken from Motion-Based Multiple Object Tracking
         % Copyright 2014 The MathWorks, Inc.
         function obj = frame_analyser()
-            % Initialize Video I/O
-            % Create objects for reading a video from a file, drawing the tracked
-            % objects in each frame, and playing the video.
-            
-            % Create a video reader.
-            obj.video_reader = VideoReader('/Users/denniszanutto/Downloads/Pallavolo_1.mp4');
-            %   obj.reader.CurrentTime = 180;
-            % Create two video players, one to display the video,
-            % and one to display the foreground mask.
-            % obj.mask_player = vision.VideoPlayer('Position', [740, 400, 700, 400]);
-            obj.video_player = vision.VideoPlayer('Position', [20, 400, 700, 400]);
             
             % Create System objects for foreground detection and blob analysis
             
@@ -76,12 +59,6 @@ classdef frame_analyser
 %             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
 %                 'BestMatchNeighborhoodOutputPort', true);
 %             
-            % I'll create the object whnen I hear the whistle, doen't make
-            % sense to track i out of the actions
-            obj.ball = [];
-            
-            obj.old_frame = [];
-            
             obj.debug = 1;
         end
         
@@ -134,7 +111,7 @@ classdef frame_analyser
             end
         end
         
-        function [set] = foreground_analysis( obj, frame)
+        function [set] = foreground_analysis( obj, frame, last_known)
             l_r = 0.000000001;
             % Detect foreground and build the struct.
             mask = obj.f_detector.step(frame, l_r);
@@ -144,7 +121,7 @@ classdef frame_analyser
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            set = obj.arrange_prop( mask );
+            set = obj.arrange_prop( mask, last_known );
             set.mask = mask;
         end
         
@@ -154,7 +131,7 @@ classdef frame_analyser
             [mask] = obj.f_detector.step(frame, l_r);
         end
         
-        function [set] = hsv_analysis ( obj, frame )
+        function [set] = hsv_analysis ( obj, frame, last_known )
             % try to look for yellows
             color = [0.15, 0.25];
             
@@ -167,111 +144,27 @@ classdef frame_analyser
             mask = imfill(mask, 'holes');
             
             % I think I can remove it from here
-            set = obj.arrange_prop( mask );
+            set = obj.arrange_prop( mask, last_known );
             set.mask = mask;
             % bbox = obj.h_tracker( hsv_frame(:,:,1) ); %#ok<NASGU>
         end
         
-        function [set] = step_analysis( obj, frame )
+        function [set] = step_analysis( obj, frame, old_frame, last_known )
             %analyssi between subsequnet frames
-            mask = sum( abs( obj.old_frame-frame ), 3 ) > 20;
+            mask = sum( abs( old_frame-frame ), 3 ) > 20;
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            set = obj.arrange_prop( mask );
+            set = obj.arrange_prop( mask, last_known );
             set.mask = mask;
             %motion = obj.block_matcher( frame, obj.old_frame ); %#ok<NASGU>
         end
         
-        function obj = update_old( obj, frame )
-            %update old frame for step analysis
-            obj.old_frame = frame;
-        end
-        
-        function obj = start_action( obj , frame, starting_side,  x, y)
-            % when the referee whistle the action begins
-            % Iìd like to use the template matcher, to find the first
-            % instance of the ball.
-            % now I just select it
-            obj.ball.starting_side = starting_side;
-            obj.ball = history_tracker();
-            
-            if( obj.ball.starting_side == 0 ) % it's on the far side
-                %it should be visible
-                
-                % known info for now it is okay
-                %                 x = [839, 853];
-                %                 y = [29, 43];
-                
-                obj.ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
-                obj.ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
-                obj.ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
-                obj.ball.state{end} = "known";
-                obj.ball.length = obj.ball.length +1;
-                obj.ball.total_visible_count = obj.ball.total_visible_count + 1;
-                %reset
-                obj.ball.consecutive_invisible = 0;
-                
-                %                 % template matching
-                %                 target = imread( '/Users/denniszanutto/Downloads/target_image.jpg' );
-                %                 roi_right_side = [740, 0, 525, 240];
-                %
-                %                 figure; imshow(frame); hold on; rectangle( 'Position', roi_right_side, 'EdgeColor', 'red');
-                %
-                %
-                %                 pos = obj.template_matcher( rgb2gray( frame ), rgb2gray(target), roi_right_side );
-                %                 viscircles( pos, 5 );
-            else
-                % it's out of the picture or covered
-                
-            end
-        end
-        
-        function obj = end_action( obj )
-            %again, the referee whistle, ball has touched the ground. ended
-            %action
-            
-            %basically release the object ball that tracks history
-            obj.ball = [];
-            %save it
-        end
-        
-        function obj = display_tracking( obj, frame, varargin )
-            if( ~isempty( obj.ball ) & ~isempty( obj.ball.bbox{end} ) )
-                frame = insertObjectAnnotation(frame, 'rectangle', ...
-                    obj.ball.bbox{end}, obj.ball.state{end});
-                
-                if obj.debug & nargin > 2
-                    f_prop = varargin{1};
-                    s_prop = varargin{2};
-                    if s_prop.length > 0
-                    frame = insertObjectAnnotation(frame, 'circle', ...
-                        [cell2mat(s_prop.centers), cell2mat(s_prop.radii)], "s", 'Color', 'red');
-                    end
-                    if f_prop.length > 0
-                    frame = insertObjectAnnotation(frame, 'circle', ...
-                        [cell2mat(f_prop.centers), cell2mat(f_prop.radii)], "f", 'Color', 'green');
-                    end
-                    
-                end
-                % Draw the objects on the mask.
-                %                 mask = insertObjectAnnotation(mask, 'rectangle', ...
-                %                     bboxes, label);
-            end
-            % Display the mask and the frame.
-            %obj.mask_player.step(mask);
-            obj.video_player.step(frame);
-        end
-        
-        function out_ = is_tracking( obj )
-            out_ = ~isempty( obj.ball );
-        end
-        
-        function set_ = arrange_prop( obj, mask  )
+        function set_ = arrange_prop( obj, mask, last_known  )
             %set_.mask = mask;
-            [mask, v_x, v_y] = obj.extract_roi( mask );
-            radius = obj.ball.radii{end};
+            [mask, v_x, v_y] = obj.extract_roi( mask, last_known.position );
+            radius = last_known.radii;
             [centers, radii] = imfindcircles(mask, [floor(0.5*radius), ceil(1.5*radius)]);
             
             set_.length = size( centers, 1);
@@ -283,9 +176,8 @@ classdef frame_analyser
             end
         end
         
-        function [roi_mask, v_x, v_y] = extract_roi( obj, mask )
-            x_y = obj.ball.image_coordinate{end};
-            
+        function [roi_mask, v_x, v_y] = extract_roi( obj, mask, x_y )
+           
             x_1 = max( floor( x_y(1) -100 ), 1 );        % leftmost point
             y_1 = max( floor( x_y(2) -100 ), 1 );        % leftmost point
             x_2 = min( floor( x_y(1) +100 ), size(mask, 2) );        % leftmost point
