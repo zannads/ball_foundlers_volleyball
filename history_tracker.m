@@ -15,9 +15,6 @@ classdef history_tracker
         
         speed;
         
-        prediction_coordinate;
-        prediction_radii;
-        k_step;
     end
     
     methods
@@ -33,9 +30,7 @@ classdef history_tracker
             obj.consecutive_invisible = 0;
             obj.starting_side = 0;
             obj.speed = [0, 0];
-%             obj.k_step = 3;
-%             obj.prediction_coordinate{obj.k_step} = [];
-%             obj.prediction_radii{obj.k_step} = [];
+            
         end
         
         % ok add, mai usata
@@ -101,7 +96,7 @@ classdef history_tracker
             
             %costant speed costant direction
             %obj.image_coordinate{end+1} = current.image_coordinate + (current.image_coordinate - previous.image_coordinate);
-            obj.image_coordinate{end+1} = current.image_coordinate + obj.speed*d_t;
+            obj.image_coordinate{end+1} = current.image_coordinate + obj.speed*d_t*2;
             
             % skip for now
             %out_.hsv_scale
@@ -129,7 +124,7 @@ classdef history_tracker
             %total visible count and set to 0 consecutive invisible
             
             if strcmp( obj.state{end}, "predicted" )
-               
+                
                 f_set = varargin{1};
                 h_set = varargin{2};
                 s_set = varargin{3};
@@ -140,26 +135,29 @@ classdef history_tracker
                 
                 % for every of them, compute J
                 x = obj.J_values( v_set, h_set );
-                lambda = [1, 30];
-                J = lambda * x';
                 
-                % take min J idx
-                [~, n] = min( J ) ;
-                
-               
-                
-                % assign it to obj.ball
-                obj.image_coordinate{ end } = v_set.centers{ n };
-                obj.radii{ end } = v_set.radii{ n };
-                obj.bbox{ end } = ...
-                    [ floor( v_set.centers{ n } - v_set.radii{ n } ), ...
-                    2*ceil( [v_set.radii{ n }, v_set.radii{ n }] )];
-                obj.state{ end } = "known";
-                obj.total_visible_count = obj.total_visible_count + 1;
-                obj.consecutive_invisible = 0;
-                
-                r = 0.8;
-                obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
+                if size( x, 2) == 2
+                    lambda = [1, 30];
+                    J = lambda * x';
+                    
+                    % take min J idx
+                    [~, n] = min( J ) ;
+                    
+                    
+                    
+                    % assign it to obj.ball
+                    obj.image_coordinate{ end } = v_set.centers{ n };
+                    obj.radii{ end } = v_set.radii{ n };
+                    obj.bbox{ end } = ...
+                        [ floor( v_set.centers{ n } - v_set.radii{ n } ), ...
+                        2*ceil( [v_set.radii{ n }, v_set.radii{ n }] )];
+                    obj.state{ end } = "known";
+                    obj.total_visible_count = obj.total_visible_count + 1;
+                    obj.consecutive_invisible = 0;
+                    
+                    r = 0.8;
+                    obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
+                end
             end
             
             
@@ -189,7 +187,7 @@ classdef history_tracker
                 for idx = 1: f_set.length
                     distances( idx ) = norm( obj.image_coordinate{end} - f_set.centers{ idx, : } ) ;
                 end
-               
+                
                 set_.length = min( quantity, f_set.length ) ;
                 set_.centers{ set_.length, 1} = 0;
                 set_.radii { set_.length, 1} = 0;
@@ -229,7 +227,7 @@ classdef history_tracker
                 while kdx > 0 % and dim less then n
                     [m, n] = min( distances , [], 'all', 'linear');
                     if m <= 2*obj.radii{ end }
-                        r = ceil( n/s_set.length ) ; 
+                        r = ceil( n/s_set.length ) ;
                         c = n- (r-1)*s_set.length ;
                         
                         
@@ -262,7 +260,7 @@ classdef history_tracker
                     set_.radii { set_.length, 1} = 0;
                     set_.d_prev{ set_.length, 1} = 0;
                     set_.strength{ set_.length, 1} = 0;
-
+                    
                     max_ = max( distances) +1;
                     while idx <= set_.length
                         [m, n] = min( distances );
@@ -278,7 +276,7 @@ classdef history_tracker
                         idx = idx+1;
                     end
                 end
-                    
+                
             end
             
         end
@@ -303,6 +301,7 @@ classdef history_tracker
             end
             
             x = [ distance_from_prev, color_ratio ];
+            
         end
     end
 end
