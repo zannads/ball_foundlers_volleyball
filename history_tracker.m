@@ -91,24 +91,16 @@ classdef history_tracker
             current.bbox = obj.bbox{end};
             current.image_coordinate = obj.image_coordinate{end};
             
-            previous.bbox = obj.bbox{end-1};
-            previous.image_coordinate = obj.image_coordinate{end-1};
-            
+%             previous.bbox = obj.bbox{end-1};
+%             previous.image_coordinate = obj.image_coordinate{end-1};
+%             
             %costant speed costant direction
             %obj.image_coordinate{end+1} = current.image_coordinate + (current.image_coordinate - previous.image_coordinate);
             obj.image_coordinate{end+1} = current.image_coordinate + obj.speed*d_t*2;
             
-            % skip for now
-            %out_.hsv_scale
-            % dimension constant scaling wrt to previous area
-            A_1 = current.bbox(4)*current.bbox(3);
-            A_2 = previous.bbox(4)*previous.bbox(3);
-            new_area = current.bbox(3:4)*A_1/A_2;
-            new_top = current.bbox(1:2) - ceil ((new_area-current.bbox(3:4))/2) ;
             
-            obj.radii{end +1} = current.radii*A_1/A_2;
-            %obj.radii{end +1} = current.radii^2/previous.radii;
-            obj.bbox{end+1} = [new_top, new_area] ;
+            obj.radii{end +1} = current.radii;
+            obj.bbox{end+1} = bbox_from_circle( current.image_coordinate, current.radii, 'std');
             obj.state{end+1} = "predicted";
             obj.length = obj.length + 1;
             % unchanged obj.total_visible_count
@@ -143,14 +135,10 @@ classdef history_tracker
                     % take min J idx
                     [~, n] = min( J ) ;
                     
-                    
-                    
                     % assign it to obj.ball
                     obj.image_coordinate{ end } = v_set.centers{ n };
                     obj.radii{ end } = v_set.radii{ n };
-                    obj.bbox{ end } = ...
-                        [ floor( v_set.centers{ n } - v_set.radii{ n } ), ...
-                        2*ceil( [v_set.radii{ n }, v_set.radii{ n }] )];
+                    obj.bbox{ end } = bbox_from_circle( v_set.centers{ n }, v_set.radii{ n }, 'std' );
                     obj.state{ end } = "known";
                     obj.total_visible_count = obj.total_visible_count + 1;
                     obj.consecutive_invisible = 0;
@@ -281,7 +269,7 @@ classdef history_tracker
             
         end
         
-        function x = J_values( obj, v_set, h_set )
+        function x = J_values( ~, v_set, h_set ) 
             
             % x1
             %             distance_from_prev = zeros( v_set.length, 1);
@@ -293,11 +281,9 @@ classdef history_tracker
             % x5
             color_ratio = zeros( v_set.length, 1);
             for idx = 1: v_set.length
-                bboxes( 1:2 ) = floor( v_set.centers{ idx } - v_set.radii{ idx } );
-                bboxes( 3:4 ) = 2*ceil( [v_set.radii{ idx }, v_set.radii{ idx }] );
-                % attention with the indices if they go below 0
-                temp = h_set.mask( bboxes(2):bboxes(2)+bboxes(4), bboxes(1):bboxes(1)+bboxes(3) );
-                color_ratio(idx) = 1 - sum( temp, 'all' )/( bboxes(3)*bboxes(4) );
+                [mask, ~, ~] = extract_roi( h_set.mask, v_set.centers{ idx }, v_set.radii{ idx } );
+                
+                color_ratio(idx) = 1 - sum( mask, 'all' )/ ( size(mask, 1)* size(mask, 2) );
             end
             
             x = [ distance_from_prev, color_ratio ];

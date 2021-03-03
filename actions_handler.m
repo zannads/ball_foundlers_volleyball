@@ -13,7 +13,6 @@ classdef actions_handler
         file_directory = [];
         filename = [];
         
-        video_directory = [];
         videoname = [];
     end
     
@@ -93,20 +92,54 @@ classdef actions_handler
             str = input( "Starting time :");
             obj.set.(name).starting_time = str;
             
-            str = input( "Starting side :");
-            obj.set.(name).starting_side = str;
+            reader = VideoReader( obj.videoname );            
+            reader.CurrentTime = obj.set.(name).starting_time;
+    
+            frame = readFrame( reader );
+            f_h = figure; imshow( frame ); title( 'Select the starting position of the ball' );
             
-            str = input( "Starting position x :");
-            obj.set.(name).position_x = str;
+            [x, y] = getpts();
+            obj.set.(name).position_x = [ floor( min(x)), ceil( max(x) ) ]; 
+            obj.set.(name).position_y = [ floor( min(y)), ceil( max(y) ) ]; 
+            close(f_h);
+            disp( "Thank you :) ");
+            % for this moment always right, in future I can discriminate
+            % better
+            obj.set.(name).starting_side = 0;
             
-            str = input( "Starting position y :");
-            obj.set.(name).position_y = str;
+            disp(  "Starting side : ");
+            disp( obj.set.(name).starting_side );
+            disp( " ");
+            disp(  "Starting position x : ");
+            disp( obj.set.(name).position_x );
+            disp( " ");
+            disp(  "Starting position y : ");
+            disp( obj.set.(name).position_y );
+            disp( " ");
             
+%             str = input( "Starting side :");
+%             obj.set.(name).starting_side = str;
+%
+%             str = input( "Starting position x :");
+%             obj.set.(name).position_x = str;
+%             
+%             str = input( "Starting position y :");
+%             obj.set.(name).position_y = str;
+%             
             str = input( "Ending time : ");
             obj.set.(name).ending_time = str;
             
             obj.total = obj.total +1;
         end
+        
+        function obj = set_videoname( obj, path_ )
+            obj.videoname = path_;
+        end
+        
+        function out = get_videoname( obj )
+            out = obj.videoname;
+        end
+            
     end
     
     methods (Static)

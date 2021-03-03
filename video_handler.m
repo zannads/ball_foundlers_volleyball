@@ -14,17 +14,17 @@ classdef video_handler
     end
     
     methods
-        function obj = video_handler()
+        function obj = video_handler(video_directory)
             % Initialize Video I/O
             % Create objects for reading a video from a file, drawing the tracked
             % objects in each frame, and playing the video.
-            obj.reader = VideoReader('/Users/denniszanutto/Downloads/Pallavolo_1.mp4');
+            obj.reader = VideoReader( video_directory );
             
             %   obj.reader.CurrentTime = 180;
             % Create two video players, one to display the video,
             % and one to display the foreground mask.
             % obj.mask_player = vision.VideoPlayer('Position', [740, 400, 700, 400]);
-            obj.player = vision.VideoPlayer('Position', [20, 400, 700, 400]);
+            obj.player = vision.VideoPlayer('Position', [20, 400, 720, 1280]);
             
             obj.old_frame = cell( obj.memory, 1 );
         end
@@ -35,7 +35,7 @@ classdef video_handler
             obj.old_frame{1} = obj.frame;
         end
         
-        function ball = start_action( obj , starting_side,  x, y)
+        function ball = start_action( ~ , starting_side,  x, y)
             % when the referee whistle the action begins
             % Iìd like to use the template matcher, to find the first
             % instance of the ball.

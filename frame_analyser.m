@@ -161,9 +161,9 @@ classdef frame_analyser
             %motion = obj.block_matcher( frame, obj.old_frame ); %#ok<NASGU>
         end
         
-        function set_ = arrange_prop( obj, mask, last_known  )
+        function set_ = arrange_prop( ~, mask, last_known  )
             %set_.mask = mask;
-            [mask, v_x, v_y] = obj.extract_roi( mask, last_known.position );
+            [mask, v_x, v_y] = extract_roi( mask, last_known.position, 100 );
             radius = last_known.radii;
             m_r = min( max( floor(0.5*radius), 3), 10) ;
             M_r = max( min( ceil(1.5*radius), 15), 5);
@@ -178,17 +178,7 @@ classdef frame_analyser
             end
         end
         
-        function [roi_mask, v_x, v_y] = extract_roi( obj, mask, x_y )
-           
-            x_1 = max( floor( x_y(1) -100 ), 1 );        % leftmost point
-            y_1 = max( floor( x_y(2) -100 ), 1 );        % leftmost point
-            x_2 = min( floor( x_y(1) +100 ), size(mask, 2) );        % leftmost point
-            y_2 = min( floor( x_y(2) +100 ), size(mask, 1) );        % leftmost point
-            
-            roi_mask = mask( y_1:y_2, x_1:x_2 );
-            v_x = x_1;
-            v_y = y_1;
-        end
+        
     end
 end
 

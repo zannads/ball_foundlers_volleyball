@@ -26,13 +26,12 @@
 
 %%
 a_h = actions_handler( cd, 'actions.mat');
-v_h = video_handler();
+v_h = video_handler( a_h.get_videoname );
 f_a = frame_analyser();
 
 v_h.reader.CurrentTime = (a_h.training_frames(1)-1)/v_h.reader.FrameRate;
 
 count = 1;
-
 while v_h.reader.CurrentTime < a_h.training_frames(2)/v_h.reader.FrameRate
     if ~ mod( count, 100 )
         disp( "Learning background" );
@@ -46,6 +45,7 @@ end
 
 %%
 
+warning( 'off' );
 %starting moment of the first action
 % I should listen to whistle
 for idx = 1:a_h.total
@@ -79,5 +79,4 @@ for idx = 1:a_h.total
     % referee has whistle again, ball has touched ground
     v_h = v_h.end_action();
 end
-
 
