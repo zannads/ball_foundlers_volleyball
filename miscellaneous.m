@@ -156,3 +156,66 @@ figure; imshow(video_frame);
  figure; imshow(video_frame_2);
   hold on; plot(b);
 
+
+  %%
+  
+  %ok predict
+        function obj = predict_location( obj , frame ) %#ok<INUSD>
+            % se il precedente è unknown
+            % chiedi punt
+            %             if strcmp ( obj.state{end} , "unknown" )
+            %                 %acquire pts from image
+            %                 % set to known
+            %                 % length = +1
+            %
+            %                 return;
+            %             end
+            
+            % se il precedente è known o predicted
+            % se il pre preceente è unknown o non esiste
+            % same point
+            if obj.length == 1 | strcmp ( obj.state{end-1}, "unknown" )
+                % repeat the same point
+                % set to predicted
+                % length = length +1
+                obj.bbox{end+1} = obj.bbox{end};
+                obj.radii{end+1} = obj.radii{end};
+                obj.image_coordinate{end+1} = obj.image_coordinate{end};
+                obj.state{end+1} = "predicted";
+                obj.length = obj.length+1;
+                % unchanged obj.total_visible_count
+                obj.consecutive_invisible = obj.consecutive_invisible + 1;
+                return;
+            end
+            
+            
+            % altrimenti
+            %liinear interp
+            
+            d_t = 1/25;
+            current.radii = obj.radii{end};
+            current.bbox = obj.bbox{end};
+            current.image_coordinate = obj.image_coordinate{end};
+            
+%             previous.bbox = obj.bbox{end-1};
+%             previous.image_coordinate = obj.image_coordinate{end-1};
+%             
+            %costant speed costant direction
+            %obj.image_coordinate{end+1} = current.image_coordinate + (current.image_coordinate - previous.image_coordinate);
+            obj.image_coordinate{end+1} = current.image_coordinate + obj.speed*d_t*2;
+            
+            
+            obj.radii{end +1} = current.radii;
+            obj.bbox{end+1} = bbox_from_circle( current.image_coordinate, current.radii, 'std');
+            obj.state{end+1} = "predicted";
+            obj.length = obj.length + 1;
+            % unchanged obj.total_visible_count
+            obj.consecutive_invisible = obj.consecutive_invisible + 1;
+        end
+        
+        
+        
+         
+        
+        
+  

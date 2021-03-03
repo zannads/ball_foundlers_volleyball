@@ -56,6 +56,8 @@ for idx = 1:a_h.total
     v_h = v_h.next_frame();
     
     ball = v_h.start_action( current.starting_side, current.position_x, current.position_y);
+            
+    k_f = configureKalmanFilter( 'ConstantAcceleration', [ mean(current.position_x), mean(current.position_y) ], [1e-5, 1, 10], [25, 25, 25], 50);
     v_h = v_h.display_tracking( ball );
     
     while( v_h.reader.CurrentTime <= current.ending_time )
@@ -68,13 +70,21 @@ for idx = 1:a_h.total
         [h_prop] = f_a.hsv_analysis( v_h.frame, last_known );
         [s_prop] = f_a.step_analysis( v_h.frame, v_h.old_frame{1}, last_known );
         
-        ball = ball.predict_location( v_h.frame );
-        %last one is the predicted
+        ball_pred.position = predict( k_f );
+        ball_pred.radii = last_known.radii;
         
-        ball = ball.assignment( f_prop, h_prop, s_prop );
+        b_match = assign_detection_to_prediction( ball_pred, f_prop, h_prop, s_prop );
+         
+        if ~isempty( b_match )
+            ball_pos = correct( k_f, b_match.position );
+            % add it to history
+            ball = ball.add( b_match.position, b_match.radii, "known" );
+        else    
+            ball = ball.add( ball_pred.position, ball_pred.radii, "predicted" );
+        end
         
         % display video
-        v_h = v_h.display_tracking( ball, f_prop, s_prop);
+        v_h = v_h.display_tracking( ball, f_prop, s_prop, ball_pred);
     end
     % referee has whistle again, ball has touched ground
     v_h = v_h.end_action();

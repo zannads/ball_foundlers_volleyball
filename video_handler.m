@@ -10,7 +10,7 @@ classdef video_handler
         old_frame = cell(0);
         frame = [];
         
-        debug = 0;
+        debug = 1;
     end
     
     methods
@@ -41,16 +41,10 @@ classdef video_handler
             % instance of the ball.
             % now I just select it
            
-            ball = history_tracker();
-            ball.starting_side = starting_side;
+           ball = history_tracker( );
             
-            if( ball.starting_side == 0 ) % it's on the far side
-                %it should be visible
-                
-                % known info for now it is okay
-                %                 x = [839, 853];
-                %                 y = [29, 43];
-                
+            if( starting_side == 0 ) % it's on the far side
+                 % could substitute with add
                 ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
                 ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
                 ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
@@ -91,6 +85,7 @@ classdef video_handler
                 if obj.debug & nargin > 2
                     f_prop = varargin{1};
                     s_prop = varargin{2};
+                    t_l = varargin{3};
                     if s_prop.length > 0
                     tframe = insertObjectAnnotation(tframe, 'circle', ...
                         [cell2mat(s_prop.centers), cell2mat(s_prop.radii)], "s", 'Color', 'red');
@@ -98,6 +93,10 @@ classdef video_handler
                     if f_prop.length > 0
                     tframe = insertObjectAnnotation(tframe, 'circle', ...
                         [cell2mat(f_prop.centers), cell2mat(f_prop.radii)], "f", 'Color', 'green');
+                    end
+                    if ~isempty( t_l )
+                        tframe = insertObjectAnnotation(tframe, 'circle', ...
+                        [t_l.position, t_l.radii], "kalm", 'Color', 'magenta');
                     end
                     
                 end
