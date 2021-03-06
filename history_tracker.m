@@ -119,7 +119,7 @@ classdef history_tracker
                     lambda = [1, 30];
                     J = lambda * x';
                     
-                    cost_non_assignment = 60; % 30 pixel dalla prevision più 30 di color
+                    cost_non_assignment = 70; % 40 pixel dalla prevision più 30 di color
                     % take min J idx
                     [m, n] = min( J ) ;
                     

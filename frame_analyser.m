@@ -1,8 +1,17 @@
 classdef frame_analyser
-    %FRAME_ANALYSER Summary of this class goes here
-    %   Detailed explanation goes here
-    
-    properties
+    %FRAME_ANALYSER Class to analyse the frames in a volleyball match
+    %   To recognise the ball in a volleyball match is a hard work. To do
+    %   so, multiple analysis needs to be performed, using differente
+    %   techinques because the ball doesn't have any typical feature that
+    %   makes it easy to be recognised.
+    %   This techniques includes:
+    %   - Mixture of gaussian to learn the background.
+    %   - blob analyser system object to recognize the moving objects.
+    %   - analysis of subsequent frames to detect fast moving objects.
+    %   - hsv space color analysis.
+
+    properties (Access=private)
+        % Look at the constructor for more info.
         f_detector = [];
         blob_analyser = [];
         h_tracker = [];
@@ -10,30 +19,35 @@ classdef frame_analyser
         template_matcher = [];
         
         report = [];
-        
         debug = 0;
+        
+        % default Params
+        num_gaussians  = 5;
+        minimum_back_ratio = 0.7;
+        adapt_learning_rate = 0;
+        train_frames = 500;
+        min_area = 400;
+        max_area = 800;
     end
     
-    
     methods
-        %% Create System Objects
-        % Create System objects used for reading the video frames, detecting
-        % foreground objects, and displaying results.
-        % taken from Motion-Based Multiple Object Tracking
-        % Copyright 2014 The MathWorks, Inc.
+        %% Constructor
         function obj = frame_analyser()
-            
-            % Create System objects for foreground detection and blob analysis
+            % Create System objects for foreground detection and blob
+            % analysis.
             
             % The foreground detector is used to segment moving objects from
             % the background. It outputs a binary mask, where the pixel value
             % of 1 corresponds to the foreground and the value of 0 corresponds
             % to the background.
             
-            %             obj.f_detector = vision.ForegroundDetector('NumGaussians', 3, ...
-            %                 'NumTrainingFrames', 500, 'MinimumBackgroundRatio', 0.7);
-            obj.f_detector = vision.ForegroundDetector('NumGaussians', 5, ...
-                'AdaptLearningRate', 0, 'MinimumBackgroundRatio', 0.7);
+            if obj.adapt_learning_rate
+                obj.f_detector = vision.ForegroundDetector('NumGaussians', obj.num_gaussians, ...
+                    'NumTrainingFrames', obj.train_frames, 'MinimumBackgroundRatio', obj.minimum_back_ratio);
+            else
+                obj.f_detector = vision.ForegroundDetector('NumGaussians', obj.num_gaussians, ...
+                    'AdaptLearningRate', obj.adapt_learning_rate, 'MinimumBackgroundRatio', obj.minimum_back_ratio);
+            end
             
             % Connected groups of foreground pixels are likely to correspond to moving
             % objects.  The blob analysis System object is used to find such groups
@@ -42,7 +56,7 @@ classdef frame_analyser
             
             obj.blob_analyser = vision.BlobAnalysis('BoundingBoxOutputPort', true, ...
                 'AreaOutputPort', true, 'CentroidOutputPort', true, ...
-                'MinimumBlobArea', 400, 'MaximumBlobArea', 800);
+                'MinimumBlobArea', obj.min_area, 'MaximumBlobArea', obj.max_area);
             
             %             start_image = imread( '/Users/denniszanutto/Downloads/start_image.jpg');
             %             start_image_hsv = rgb2hsv(start_image);
@@ -61,40 +75,61 @@ classdef frame_analyser
             %             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
             %                 'BestMatchNeighborhoodOutputPort', true);
             %
+            % the structure of the report is the following one:
+            %   - for foreground analysis and step (difference between frames):
+            %       - mask: binary image obtained from the techinque.
+            %       - c_number: number of found circles.
+            %       - c_centers: center of the found circles.
+            %       - c_radii: radius of the corresponding circles.
+            %       - b_number: number of validated blobs.
+            %       - b_centers: center of the validated blobs.
+            %       - b_axis: the two major directions of the blobs.
+            %   - for hsv space: just the mask obatined.
             t = struct( 'mask', [], 'c_number', 0, 'c_centers', [], 'c_radii', [], 'b_number', 0, 'b_centers', [], 'b_axis', [] );
             
             obj.report = struct( 'foreground', t, 'stepper', t, 'hsv', [] );
-            obj.debug = 1;
         end
         
-        %% Foreground Analysis
-        % The |foreground_analysis| function returns the centroids and the bounding boxes
-        % of the probable ball.
-        
-        % The function performs motion segmentation using the foreground detector.
-        % It then performs morphological operations on the resulting binary mask to
-        % remove noisy pixels and to fill the holes in the remaining blobs.
+        %% METHODS
         
         function obj = write_report( obj, frame, old_frame, last_known)
+            %WRITE_REPORT Analysis of the frame based on old informations.
+            % this method analyses the frame using the 3 techinques
+            % introduced above. Then, for each of them it just checks for the
+            % most closed circles to the latest known position.
+            % It looks only for circles because for most of the time it
+            % should be enough.
             
+            % Foreground detection
             obj.report.foreground.mask = obj.foreground_analysis( frame);
+            % Search round objects in the mask.
             obj = obj.circle_search( 'foreground', last_known );
             
+            % Step detecion
             obj.report.stepper.mask = obj.step_analysis( frame, old_frame);
+            
             obj = obj.circle_search( 'stepper', last_known );
             
+            % Color space detection.
             obj.report.hsv = obj.hsv_analysis( frame );
             % no circle search
-            
-            
         end
         
-        function [set] = foreground_analysis_bbox( obj, frame)
+        function obj = deepen_report( obj )
+            %DEEPEN_REPORT Analysis of the frame for blob detection when
+            %circle search has failed.
+            % This method searches for blobs that can be connected to the
+            % ball using the 3 masks already computed.
             
-            % Detect foreground and build the struct.
+            % to do:
+        end
+        
+        function [set] = foreground_analysis_blobanalyser( obj, frame)
+            %FOREGROUND_ANLYSIS_BLOBANALYSER Perform recognition of bboxes
+            %using blob analyser.
+            
+            % Detect foreground.
             set.mask = obj.f_detector.step(frame);
-            set.bboxes = cell(0);
-            set.centroids = cell(0);
             
             % Apply morphological operations to remove noise and fill in holes.
             set.mask = imopen(set.mask, strel('rectangle', [3,3]));
@@ -104,7 +139,7 @@ classdef frame_analyser
             % Perform blob analysis to find connected components.
             [~, centroids, bboxes] = obj.blob_analyser.step(set.mask);
             
-            %try to remove not squared boxes
+            % Remove not squared boxes.
             ratios = double(bboxes(:,4))./double(bboxes(:,3));
             ratios = (ratios > 0.5 & ratios < 1.5);
             if sum(ratios) >0
@@ -123,18 +158,18 @@ classdef frame_analyser
                 centroids = [];
             end
             
-            % move to cells
-            for idx = 1:size(bboxes, 1)
-                set.bboxes{idx} = bboxes( idx, : );
-                set.centroids{idx} = centroids( idx, :);
-            end
+            set.bboxes = bboxes;
+            set.centroids = centroids;
         end
         
         function [mask] = foreground_analysis( obj, frame)
-            l_r = 0.000000001;
-            % Detect foreground and build the struct.
-            mask = obj.f_detector.step(frame, l_r);
-            %mask = obj.f_detector.step(frame);
+            % Detect foreground.
+            if obj.adapt_learning_rate
+                mask = obj.f_detector.step(frame);
+            else
+                l_r = 0.000000001; 
+                mask = obj.f_detector.step(frame, l_r);
+            end
             
             % Apply morphological operations to remove noise and fill in holes.
             mask = imopen(mask, strel('rectangle', [3,3]));
@@ -142,14 +177,20 @@ classdef frame_analyser
             mask = imfill(mask, 'holes');
         end
         
-        function [mask] = learn_background( obj, frame, c )
+        function [mask] = learn_background( obj, frame, l_r ) %#ok<INUSD>
             % Detect foreground.
-            l_r = 0.005;
-            [mask] = obj.f_detector.step(frame, l_r);
-            %[mask] = obj.f_detector.step(frame);
+            if obj.adapt_learning_rate
+                mask = obj.f_detector.step(frame);
+            else
+                %when using AdaptLearningRate == true the learning rate is
+                %fixed to 1/number of frame thus, I pass l_r and invert it 
+                %l_r = l_r.^(-1);
+                l_r = 0.005; 
+                mask = obj.f_detector.step(frame, l_r);
+            end
         end
         
-        function [mask] = hsv_analysis ( obj, frame )
+        function [mask] = hsv_analysis ( obj, frame ) %#ok<INUSL>
             % try to look for yellows
             color = [0.15, 0.25];
             
@@ -161,21 +202,18 @@ classdef frame_analyser
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            % I think I can remove it from here
-            %             set = obj.arrange_prop( mask, last_known );
-            %             set.mask = mask;
+            %eventually
             % bbox = obj.h_tracker( hsv_frame(:,:,1) ); %#ok<NASGU>
         end
         
-        function [mask] = step_analysis( obj, frame, old_frame )
-            %analyssi between subsequnet frames
+        function [mask] = step_analysis( obj, frame, old_frame ) %#ok<INUSL>
+            %analysis between subsequnet frames
             mask = sum( abs( old_frame-frame ), 3 ) > 20;
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            %             set = obj.arrange_prop( mask, last_known );
-            %             set.mask = mask;
+            %eventually
             %motion = obj.block_matcher( frame, obj.old_frame ); %#ok<NASGU>
         end
         
@@ -194,12 +232,6 @@ classdef frame_analyser
                 obj.report.(who).c_centers = centers + [v_x, v_y];
                 obj.report.(who).c_radii = radii;
             end
-            %             set_.centers = cell( l, 1 );
-            %             set_.radii = cell( set_.length, 1 );
-            %             for idx = 1:size( centers, 1)
-            %                 set_.centers{idx} = centers( idx, : )
-            %                 set_.radii{idx} = radii( idx, : );
-            %             end
         end
         
         function [out] = get_report( obj )

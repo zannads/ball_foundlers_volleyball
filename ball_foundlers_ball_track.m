@@ -1,36 +1,24 @@
 %% ball_foundlers_ball_tracker
 
 %this program should perform the tracking of a volleyball during a match, a
-%couple of different approaches ae used in order to maximize the time
-%instants where the ball is recognized
+%couple of different approaches are used in order to maximize the time
+%instants where the ball is recognized.
 
-% both motion based tracking and object recoingission at every frame are
-% performed in a (I hope ) smart way
+% Motion based tracking is performed, using difference between frames and a
+% mixture of gaussians to detect the object with respect to the foreground.
 
 %% MAIN ALGORITHM
 
-% create object and initialize tracker
-% train foreground object detector (saving it and eventulaly uploading it
-% would be nice)
-
-% then every frame since I decide to start to track he ball I have two
-% options
-
-% 1 foreground object detector looks for it, then the resulting blob is
-% subtracted with the color analysis. I hope it leaves just the ball.
-%if it's not enough, starting from a previous step on where was the ball
-%could be interesting to look for it near to it
-
-% Sometimes the ball will not be on the pitch. I discrad this result and I
-% don't care. If I'll be good enough I'll complete the trajectories.
-
-%%
+% create actions handler to manage the actions of the game.
 a_h = actions_handler( cd, 'actions.mat');
+% create video handler to manage the reader and players for the video, it
+% also keeps memory of the last steps.
 v_h = video_handler( a_h.get_videoname );
+% create frame analyser to detect the best possible matches at every frame.
 f_a = frame_analyser();
 
+% I start by leaving the object frame analyser learning the background.
 v_h.reader.CurrentTime = (a_h.training_frames(1)-1)/v_h.reader.FrameRate;
-
 count = 1;
 while v_h.reader.CurrentTime < a_h.training_frames(2)/v_h.reader.FrameRate
     if ~ mod( count, 100 )
@@ -41,45 +29,54 @@ while v_h.reader.CurrentTime < a_h.training_frames(2)/v_h.reader.FrameRate
     mask = f_a.learn_background(v_h.frame, count);
     count = count+1;
 end
-
-
 %%
-
+% imfindcircles prints a warning when the circles we are looking for are
+% less then 5 pixels. Since ball is mostly around 10 pixels this message is
+% printed many times. 
 warning( 'off' );
-%starting moment of the first action
-% I should listen to whistle
+% To recognise the action another script should be used, in this case is
+% done by hand.
 for idx = 1:a_h.total
+    % acquire the action
+    current = a_h.get( idx );
     
-    current = a_h.next();
-    
+    % I go the right moment
     v_h.reader.CurrentTime = current.starting_time;
     v_h = v_h.next_frame();
     
+    % I create the object to track the ball. 
     ball = v_h.start_action( current.starting_side, current.position_x, current.position_y);
+    % Startting positions are known, thus I'll show them.
     v_h = v_h.display_tracking( ball );
     
+    % until the action ends
     while( v_h.reader.CurrentTime <= current.ending_time )
+        % Go to the successive frame
         v_h = v_h.next_frame();
         
-        %analysis to perfrom when the action is on
+        % Important informations to reduce the search.
         last_known.position = ball.image_coordinate{end};
         last_known.radii = ball.radii{end};
         
+        % Frame_analyser analyses the frame based on memory of
+        % last_positions.
         f_a = f_a.write_report( v_h.frame, v_h.old_frame{1}, last_known );
         report = f_a.get_report();
         
-%         [f_prop] = f_a.foreground_analysis( v_h.frame, last_known );
-%         [h_prop] = f_a.hsv_analysis( v_h.frame, last_known );
-%         [s_prop] = f_a.step_analysis( v_h.frame, v_h.old_frame{1}, last_known );
-        
+        % I add the prediction of the ball for this step, in the last place
+        % of to the history, if I won't have any match this will remain 
+        % there.
         ball = ball.predict_location( );
-        %last one is the predicted
-        
+       
+        % Check if the prediction matches something from the analysis of the
+        % frame
         ball = ball.assignment( report );
         
-        % display video
+        % Display video
         v_h = v_h.display_tracking( ball);
     end
-    % referee has whistle again, ball has touched ground
+    % referee has whistle again, ball has touched ground and the action is
+    % ended. I save the history of the tracking and eventually show again the video to
+    % increase speed. 
     v_h = v_h.end_action();
 end
