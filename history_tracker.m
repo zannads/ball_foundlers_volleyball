@@ -99,7 +99,7 @@ classdef history_tracker
         end
         
         % ok first version
-        function obj = assignment(  obj, report )
+        function [obj, flag] = assignment(  obj, report )
             if strcmp( obj.state{end}, "known" )
                 return;
             end
@@ -134,6 +134,9 @@ classdef history_tracker
                         
                         r = 0.8;
                         obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
+                        flag = 1;
+                    else
+                        flag = 0;
                     end
                 end
             end

@@ -70,7 +70,7 @@ for idx = 1:a_h.total
        
         % Check if the prediction matches something from the analysis of the
         % frame
-        ball = ball.assignment( report );
+        [ball, flag] = ball.assignment( report );
         
         % Display video
         v_h = v_h.display_tracking( ball);
