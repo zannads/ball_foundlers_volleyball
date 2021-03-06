@@ -38,7 +38,7 @@ while v_h.reader.CurrentTime < a_h.training_frames(2)/v_h.reader.FrameRate
     end
     v_h.frame = readFrame(v_h.reader);
     
-    mask = f_a.learn_background(v_h.frame);
+    mask = f_a.learn_background(v_h.frame, count);
     count = count+1;
 end
 
@@ -64,19 +64,22 @@ for idx = 1:a_h.total
         %analysis to perfrom when the action is on
         last_known.position = ball.image_coordinate{end};
         last_known.radii = ball.radii{end};
-        [f_prop] = f_a.foreground_analysis( v_h.frame, last_known );
-        [h_prop] = f_a.hsv_analysis( v_h.frame, last_known );
-        [s_prop] = f_a.step_analysis( v_h.frame, v_h.old_frame{1}, last_known );
         
-        ball = ball.predict_location( v_h.frame );
+        f_a = f_a.write_report( v_h.frame, v_h.old_frame{1}, last_known );
+        report = f_a.get_report();
+        
+%         [f_prop] = f_a.foreground_analysis( v_h.frame, last_known );
+%         [h_prop] = f_a.hsv_analysis( v_h.frame, last_known );
+%         [s_prop] = f_a.step_analysis( v_h.frame, v_h.old_frame{1}, last_known );
+        
+        ball = ball.predict_location( );
         %last one is the predicted
         
-        ball = ball.assignment( f_prop, h_prop, s_prop );
+        ball = ball.assignment( report );
         
         % display video
-        v_h = v_h.display_tracking( ball, f_prop, s_prop);
+        v_h = v_h.display_tracking( ball);
     end
     % referee has whistle again, ball has touched ground
     v_h = v_h.end_action();
 end
-

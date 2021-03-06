@@ -9,6 +9,8 @@ classdef frame_analyser
         block_matcher = [];
         template_matcher = [];
         
+        report = [];
+        
         debug = 0;
     end
     
@@ -28,8 +30,8 @@ classdef frame_analyser
             % of 1 corresponds to the foreground and the value of 0 corresponds
             % to the background.
             
-%             obj.f_detector = vision.ForegroundDetector('NumGaussians', 3, ...
-%                 'NumTrainingFrames', 500, 'MinimumBackgroundRatio', 0.7);
+            %             obj.f_detector = vision.ForegroundDetector('NumGaussians', 3, ...
+            %                 'NumTrainingFrames', 500, 'MinimumBackgroundRatio', 0.7);
             obj.f_detector = vision.ForegroundDetector('NumGaussians', 5, ...
                 'AdaptLearningRate', 0, 'MinimumBackgroundRatio', 0.7);
             
@@ -42,23 +44,26 @@ classdef frame_analyser
                 'AreaOutputPort', true, 'CentroidOutputPort', true, ...
                 'MinimumBlobArea', 400, 'MaximumBlobArea', 800);
             
-%             start_image = imread( '/Users/denniszanutto/Downloads/start_image.jpg');
-%             start_image_hsv = rgb2hsv(start_image);
-%             ball_starting_region = [290, 190, 16, 16];
-%             % using hsv tracking I create the object histogram
-%             obj.h_tracker = vision.HistogramBasedTracker;
-%             initializeObject(obj.h_tracker, start_image_hsv(:,:,1) , ball_starting_region);
-%             
+            %             start_image = imread( '/Users/denniszanutto/Downloads/start_image.jpg');
+            %             start_image_hsv = rgb2hsv(start_image);
+            %             ball_starting_region = [290, 190, 16, 16];
+            %             % using hsv tracking I create the object histogram
+            %             obj.h_tracker = vision.HistogramBasedTracker;
+            %             initializeObject(obj.h_tracker, start_image_hsv(:,:,1) , ball_starting_region);
+            %
             
             % using difference between frames
-%             obj.block_matcher = vision.BlockMatcher('ReferenceFrameSource',...
-%                 'Input port','BlockSize',[720 1280]);
-%             obj.block_matcher.OutputValue = 'Horizontal and vertical components in complex form';
-%             
+            %             obj.block_matcher = vision.BlockMatcher('ReferenceFrameSource',...
+            %                 'Input port','BlockSize',[720 1280]);
+            %             obj.block_matcher.OutputValue = 'Horizontal and vertical components in complex form';
+            %
             % template matching for start of the action
-%             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
-%                 'BestMatchNeighborhoodOutputPort', true);
-%             
+            %             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
+            %                 'BestMatchNeighborhoodOutputPort', true);
+            %
+            t = struct( 'mask', [], 'c_number', 0, 'c_centers', [], 'c_radii', [], 'b_number', 0, 'b_centers', [], 'b_axis', [] );
+            
+            obj.report = struct( 'foreground', t, 'stepper', t, 'hsv', [] );
             obj.debug = 1;
         end
         
@@ -69,6 +74,20 @@ classdef frame_analyser
         % The function performs motion segmentation using the foreground detector.
         % It then performs morphological operations on the resulting binary mask to
         % remove noisy pixels and to fill the holes in the remaining blobs.
+        
+        function obj = write_report( obj, frame, old_frame, last_known)
+            
+            obj.report.foreground.mask = obj.foreground_analysis( frame);
+            obj = obj.circle_search( 'foreground', last_known );
+            
+            obj.report.stepper.mask = obj.step_analysis( frame, old_frame);
+            obj = obj.circle_search( 'stepper', last_known );
+            
+            obj.report.hsv = obj.hsv_analysis( frame );
+            % no circle search
+            
+            
+        end
         
         function [set] = foreground_analysis_bbox( obj, frame)
             
@@ -111,27 +130,26 @@ classdef frame_analyser
             end
         end
         
-        function [set] = foreground_analysis( obj, frame, last_known)
+        function [mask] = foreground_analysis( obj, frame)
             l_r = 0.000000001;
             % Detect foreground and build the struct.
             mask = obj.f_detector.step(frame, l_r);
+            %mask = obj.f_detector.step(frame);
             
             % Apply morphological operations to remove noise and fill in holes.
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
-            
-            set = obj.arrange_prop( mask, last_known );
-            set.mask = mask;
         end
         
-        function [mask] = learn_background( obj, frame )
+        function [mask] = learn_background( obj, frame, c )
             % Detect foreground.
             l_r = 0.005;
             [mask] = obj.f_detector.step(frame, l_r);
+            %[mask] = obj.f_detector.step(frame);
         end
         
-        function [set] = hsv_analysis ( obj, frame, last_known )
+        function [mask] = hsv_analysis ( obj, frame )
             % try to look for yellows
             color = [0.15, 0.25];
             
@@ -144,38 +162,48 @@ classdef frame_analyser
             mask = imfill(mask, 'holes');
             
             % I think I can remove it from here
-            set = obj.arrange_prop( mask, last_known );
-            set.mask = mask;
+            %             set = obj.arrange_prop( mask, last_known );
+            %             set.mask = mask;
             % bbox = obj.h_tracker( hsv_frame(:,:,1) ); %#ok<NASGU>
         end
         
-        function [set] = step_analysis( obj, frame, old_frame, last_known )
+        function [mask] = step_analysis( obj, frame, old_frame )
             %analyssi between subsequnet frames
             mask = sum( abs( old_frame-frame ), 3 ) > 20;
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
             
-            set = obj.arrange_prop( mask, last_known );
-            set.mask = mask;
+            %             set = obj.arrange_prop( mask, last_known );
+            %             set.mask = mask;
             %motion = obj.block_matcher( frame, obj.old_frame ); %#ok<NASGU>
         end
         
-        function set_ = arrange_prop( ~, mask, last_known  )
-            %set_.mask = mask;
+        function obj = circle_search( obj, who, last_known  )
+            mask = obj.report.(who).mask;
+            
             [mask, v_x, v_y] = extract_roi( mask, last_known.position, 100 );
             radius = last_known.radii;
             m_r = min( max( floor(0.5*radius), 3), 10) ;
             M_r = max( min( ceil(1.5*radius), 15), 5);
             [centers, radii] = imfindcircles(mask, [m_r, M_r]);
             
-            set_.length = size( centers, 1);
-            set_.centers = cell( set_.length, 1 );
-            set_.radii = cell( set_.length, 1 );
-            for idx = 1:size( centers, 1)
-                set_.centers{idx} = centers( idx, : ) + [v_x, v_y];
-                set_.radii{idx} = radii( idx, : );
+            l = size( centers, 1);
+            if l
+                obj.report.(who).c_number = l;
+                obj.report.(who).c_centers = centers + [v_x, v_y];
+                obj.report.(who).c_radii = radii;
             end
+            %             set_.centers = cell( l, 1 );
+            %             set_.radii = cell( set_.length, 1 );
+            %             for idx = 1:size( centers, 1)
+            %                 set_.centers{idx} = centers( idx, : )
+            %                 set_.radii{idx} = radii( idx, : );
+            %             end
+        end
+        
+        function [out] = get_report( obj )
+            out = obj.report;
         end
         
         
