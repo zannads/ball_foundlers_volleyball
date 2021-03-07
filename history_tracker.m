@@ -152,13 +152,27 @@ classdef history_tracker
         
         function set_ = select_strongest( obj, quantity, report )
             if strcmp( obj.state{end}, "predicted" )
-                set_ = obj.select_strongest_circles( quantity, report );
+                set_ = obj.select_strongest_circles( report );
             else % it is "not_assigned"
-                set_ = obj.select_strongest_blobs( quantity, report );
+                set_ = obj.select_strongest_blobs( report );
+            end
+            
+            % To save just the best requested results, I erase the worst ones.
+            if set_.length > quantity
+                idx = set_.length - quantity;
+                while idx
+                    [~, M] = max( set_.d_prev );
+                    
+                    set_.length = set_.length -1;
+                    set_.centers( M, : ) = [];
+                    set_.radii( M, : ) = [];
+                    set_.connect( M, : ) = [];
+                    set_.d_prev( M, : ) = [];
+                end
             end
         end
         
-        function set_ = select_strongest_circles( obj, quantity, report  )
+        function set_ = select_strongest_circles( obj, report  )
             % allocate set_
             set_.length = 0;
             set_.centers = [];
@@ -166,7 +180,7 @@ classdef history_tracker
             set_.d_prev = [];
             set_.connect = [];  % idx of s_set where it is connected to
             
-            if report.foreground.c_number
+            if report.foreground.c_number>0
                 distances=  obj.image_coordinate{end} - report.foreground.c_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
@@ -181,7 +195,7 @@ classdef history_tracker
             % second one is s_set
             % I compute the distance of every of these circles to the
             % ones of f_set. If close enough, I merge them.
-            if report.stepper.c_number
+            if report.stepper.c_number>0
                 distances=  obj.image_coordinate{end} - report.stepper.c_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
@@ -207,26 +221,10 @@ classdef history_tracker
                     end
                     idx = idx +1;
                 end
-                
-                % To save just the best requested results, I erase the worst ones.
-                if set_.length > quantity
-                    idx = set_.length - quantity;
-                    while idx
-                        [~, M] = max( set_.d_prev );
-                        
-                        set_.length = set_.length -1;
-                        set_.centers( M, : ) = [];
-                        set_.radii( M, : ) = [];
-                        set_.connect( M, : ) = [];
-                        set_.d_prev( M, : ) = [];
-                        idx = idx -1;
-                    end
-                end
-                
             end
         end
         
-        function set_ = select_strongest_blobs( obj, quantity, report )
+        function set_ = select_strongest_blobs( obj, report )
             % allocate set_
             set_.length = 0;
             set_.centers = [];
@@ -234,7 +232,7 @@ classdef history_tracker
             set_.d_prev = [];
             set_.connect = [];  % idx of s_set where it is connected to
             
-            if report.stepper.b_number
+            if report.stepper.b_number>0
                 distances=  obj.image_coordinate{end} - report.stepper.b_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
@@ -245,19 +243,7 @@ classdef history_tracker
                 set_.connect = zeros( report.stepper.b_number, 1);
             end
             
-            % To save just the best requested results, I erase the worst ones.
-            if set_.length > quantity
-                idx = set_.length - quantity;
-                while idx
-                    [~, M] = max( set_.d_prev );
-                    
-                    set_.length = set_.length -1;
-                    set_.centers( M, : ) = [];
-                    set_.radii( M, : ) = [];
-                    set_.connect( M, : ) = [];
-                    set_.d_prev( M, : ) = [];
-                end
-            end
+            
         end
         
         function x = J_values( ~, v_set, color_mask)
@@ -266,10 +252,6 @@ classdef history_tracker
                 return;
             end
             % x1
-            %             distance_from_prev = zeros( v_set.length, 1);
-            %             for idx = 1: v_set.length
-            %                 distance_from_prev( idx ) = v_set.d_prev{ idx } ;
-            %             end
             distance_from_prev = v_set.d_prev ;
             
             % x5
@@ -282,6 +264,34 @@ classdef history_tracker
             
             x = [ distance_from_prev, color_ratio ];
             
+        end
+        
+        function out = is_lost( obj )
+            st_1 = obj.state{end};
+            st_2 = obj.state{end-1};
+            st_3 = obj.state{end-2};
+            
+            comp = "unknown";
+            
+            out = ( strcmp( st_1, comp) & strcmp( st_2, comp) & strcmp( st_3, comp) );
+        end
+        
+        function obj = recover( obj , infos )
+            steps = size(infos, 1);
+            
+            figure;
+            pos = obj.image_coordinate{end-steps+1};
+            plot( pos(1), pos(2) , 'or');
+            hold on;
+            
+            colors = 'bkg';
+            for idx = 1:steps-1
+                pos = infos(idx).reports;
+                pos = pos.stepper.b_centers;
+                if ~isempty( pos )
+                    plot( pos(:, 1), pos(:, 2), 'o', 'Color', colors(idx));
+                end
+            end
         end
     end
 end

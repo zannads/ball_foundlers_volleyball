@@ -259,9 +259,9 @@ classdef frame_analyser
                 end
             end
             
-            l = size( stats , 1)*( ~isempty(stats) );
+            l = (size( stats , 1)*( ~isempty(stats) )) > 0;
             if l
-                obj.report.(who).b_number = l;
+                obj.report.(who).b_number = size( stats , 1);
                 obj.report.(who).b_centers = extractfield_( stats, 'Centroid') + [v_x, v_y];
                 obj.report.(who).b_radii = extractfield_( stats, 'MajorAxisLength')/2;
                 
@@ -279,7 +279,6 @@ classdef frame_analyser
         function [out] = get_report( obj )
             out = obj.report;
         end
-        
         
         
     end

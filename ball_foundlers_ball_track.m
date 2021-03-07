@@ -61,7 +61,7 @@ for idx = 1:a_h.total
         % Frame_analyser analyses the frame based on memory of
         % last_positions.
         f_a = f_a.write_report( v_h.frame, v_h.old_frame{1}, last_known );
-        report = f_a.get_report();
+        v_h.report = f_a.get_report();
         
         % I add the prediction of the ball for this step, in the last place
         % of to the history, if I won't have any match this will remain 
@@ -70,13 +70,18 @@ for idx = 1:a_h.total
        
         % Check if the prediction matches something from the analysis of the
         % frame
-        [ball, flag] = ball.assignment( report );
+        [ball, flag] = ball.assignment( v_h.report );
         if flag 
             f_a = f_a.deepen_report( last_known );
-            report = f_a.get_report();
+            v_h.report = f_a.get_report();
             
-            [ball, ~] = ball.assignment( report );
+            [ball, ~] = ball.assignment( v_h.report );
         end
+        
+        % I look at the situation and eventualy I go back! 
+%         if ball.length > v_h.memory & ball.is_lost()
+%            ball.recover( v_h.prepare_for_recovery() ); 
+%         end
         
         % Display video
         v_h = v_h.display_tracking( ball );
@@ -84,5 +89,5 @@ for idx = 1:a_h.total
     % referee has whistle again, ball has touched ground and the action is
     % ended. I save the history of the tracking and eventually show again the video to
     % increase speed. 
-    v_h = v_h.end_action();
+    ball = v_h.end_action( ball );
 end

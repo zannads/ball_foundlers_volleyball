@@ -9,6 +9,8 @@ classdef video_handler
         memory = 3;
         old_frame = cell(0);
         frame = [];
+        report = [];
+        old_report = cell(0);
         
         debug = 0;
     end
@@ -27,12 +29,16 @@ classdef video_handler
             obj.player = vision.VideoPlayer('Position', [20, 400, 720, 1280]);
             
             obj.old_frame = cell( obj.memory, 1 );
+            obj.old_report = cell( obj.memory, 1);
         end
         
         function obj = update_old( obj )
             %update old frame for step analysis
             obj.old_frame = [obj.old_frame(1); obj.old_frame(1:2)]; 
             obj.old_frame{1} = obj.frame;
+            
+            obj.old_report = [obj.old_report(1); obj.old_report(1:2)];
+            obj.old_report{1} = obj.report;
         end
         
         function ball = start_action( ~ , starting_side,  x, y)
@@ -46,11 +52,7 @@ classdef video_handler
             
             if( ball.starting_side == 0 ) % it's on the far side
                 %it should be visible
-                
-                % known info for now it is okay
-                %                 x = [839, 853];
-                %                 y = [29, 43];
-                
+            
                 ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
                 ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
                 ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
@@ -74,13 +76,12 @@ classdef video_handler
             end
         end
         
-        function obj = end_action( obj )
+        function out = end_action( obj, ball )
             %again, the referee whistle, ball has touched the ground. ended
             %action
-            % save and release and display
-            %basically release the object ball that tracks history
-            %obj.ball = [];
-            %save it
+            
+            
+            out = [];
         end
         
         function obj = display_tracking( obj, ball, varargin )
@@ -116,7 +117,18 @@ classdef video_handler
             obj.frame = readFrame( obj.reader );
             
         end
-        % assign missing
+        
+        function infos = prepare_for_recovery( obj )
+            frames = cell(4, 1);
+            frames{1} = obj.frame; 
+            frames(2:end) = obj.old_frame;
+            
+            reports = cell(4, 1);
+            reports{1} = obj.report;
+            reports(2:end) = obj.old_report;
+            
+            infos = struct( 'frames', frames, 'reports', reports);
+        end
     end
 end
 
