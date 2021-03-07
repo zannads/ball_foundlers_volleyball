@@ -1,15 +1,15 @@
 classdef frame_analyser
     %FRAME_ANALYSER Class to analyse the frames in a volleyball match
     %   To recognise the ball in a volleyball match is a hard work. To do
-    %   so, multiple analysis needs to be performed, using differente
-    %   techinques because the ball doesn't have any typical feature that
+    %   so, multiple analysis need to be performed using different
+    %   techinques. The ball doesn't have any typical feature that
     %   makes it easy to be recognised.
     %   This techniques includes:
     %   - Mixture of gaussian to learn the background.
     %   - blob analyser system object to recognize the moving objects.
     %   - analysis of subsequent frames to detect fast moving objects.
     %   - hsv space color analysis.
-
+    
     properties (Access=private)
         % Look at the constructor for more info.
         f_detector = [];
@@ -33,8 +33,7 @@ classdef frame_analyser
     methods
         %% Constructor
         function obj = frame_analyser()
-            % Create System objects for foreground detection and blob
-            % analysis.
+            % Create System objects analysis.
             
             % The foreground detector is used to segment moving objects from
             % the background. It outputs a binary mask, where the pixel value
@@ -99,6 +98,9 @@ classdef frame_analyser
             % most closed circles to the latest known position.
             % It looks only for circles because for most of the time it
             % should be enough.
+            % Erase old report.
+            t = struct( 'mask', [], 'c_number', 0, 'c_centers', [], 'c_radii', [], 'b_number', 0, 'b_centers', [], 'b_axis', [] );
+            obj.report = struct( 'foreground', t, 'stepper', t, 'hsv', [] );
             
             % Foreground detection
             obj.report.foreground.mask = obj.foreground_analysis( frame);
@@ -115,13 +117,15 @@ classdef frame_analyser
             % no circle search
         end
         
-        function obj = deepen_report( obj )
+        function obj = deepen_report( obj, last_known )
             %DEEPEN_REPORT Analysis of the frame for blob detection when
             %circle search has failed.
             % This method searches for blobs that can be connected to the
             % ball using the 3 masks already computed.
             
-            % to do:
+            %obj = obj.blob_search( 'foreground', last_known );
+            
+            obj = obj.blob_search( 'stepper', last_known );
         end
         
         function [set] = foreground_analysis_blobanalyser( obj, frame)
@@ -167,7 +171,7 @@ classdef frame_analyser
             if obj.adapt_learning_rate
                 mask = obj.f_detector.step(frame);
             else
-                l_r = 0.000000001; 
+                l_r = 0.000000001;
                 mask = obj.f_detector.step(frame, l_r);
             end
             
@@ -183,9 +187,13 @@ classdef frame_analyser
                 mask = obj.f_detector.step(frame);
             else
                 %when using AdaptLearningRate == true the learning rate is
-                %fixed to 1/number of frame thus, I pass l_r and invert it 
+                %fixed to 1/number of frame thus, I pass l_r and invert it
+                %in case I want to use the same technique. Otherwise 0.005,
+                %the default value is ok. Changing this parameter strongly
+                %affect the results and for fast changing scene may not provide
+                %stability to the algorithm.
                 %l_r = l_r.^(-1);
-                l_r = 0.005; 
+                l_r = 0.005;
                 mask = obj.f_detector.step(frame, l_r);
             end
         end
@@ -234,9 +242,44 @@ classdef frame_analyser
             end
         end
         
+        function obj = blob_search( obj, who, last_known )
+            mask = obj.report.(who).mask;
+            
+            [mask, v_x, v_y] = extract_roi( mask, last_known.position, 150 );
+            stats = regionprops('struct', mask ,'Area', 'BoundingBox', 'Centroid',...
+                'Circularity', 'MajorAxisLength', 'MinorAxisLength', 'Orientation' );
+           
+            % I have to prune results, based on Area, circularity ecc 
+           idx = 1;
+            while ~isempty(stats) & idx <= size( stats, 1)
+                if ( stats(idx).Area > 600 | stats(idx).Area < 100 | stats(idx).Circularity < 0.3 )
+                    stats(idx) = [];
+                else 
+                    idx = idx + 1;
+                end
+            end
+            
+            l = size( stats , 1)*( ~isempty(stats) );
+            if l
+                obj.report.(who).b_number = l;
+                obj.report.(who).b_centers = extractfield_( stats, 'Centroid') + [v_x, v_y];
+                obj.report.(who).b_radii = extractfield_( stats, 'MajorAxisLength')/2;
+                
+                if obj.debug
+                    figure; imshow(mask);
+                    r = extractfield_( stats, 'BoundingBox');
+                    for idx = 1:size(r, 1)
+                    rectangle( 'Position',r(idx,:) , 'EdgeColor', 'yellow');
+                    end
+                end
+            end
+            
+        end
+        
         function [out] = get_report( obj )
             out = obj.report;
         end
+        
         
         
     end

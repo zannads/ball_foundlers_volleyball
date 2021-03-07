@@ -71,9 +71,15 @@ for idx = 1:a_h.total
         % Check if the prediction matches something from the analysis of the
         % frame
         [ball, flag] = ball.assignment( report );
+        if flag 
+            f_a = f_a.deepen_report( last_known );
+            report = f_a.get_report();
+            
+            [ball, ~] = ball.assignment( report );
+        end
         
         % Display video
-        v_h = v_h.display_tracking( ball);
+        v_h = v_h.display_tracking( ball );
     end
     % referee has whistle again, ball has touched ground and the action is
     % ended. I save the history of the tracking and eventually show again the video to

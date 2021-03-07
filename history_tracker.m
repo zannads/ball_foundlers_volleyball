@@ -98,50 +98,47 @@ classdef history_tracker
             obj.consecutive_invisible = obj.consecutive_invisible + 1;
         end
         
-        % ok first version
         function [obj, flag] = assignment(  obj, report )
+            flag = 1;
             if strcmp( obj.state{end}, "known" )
                 return;
             end
-            %If i decide that the prevision is correct, I need to increase
-            %total visible count and set to 0 consecutive invisible
             
-            if strcmp( obj.state{end}, "predicted" )
+            % get the n  closest to prediction,
+            n = 10;
+            v_set = obj.select_strongest( n, report);
+            
+            % for every of them, compute J
+            x = obj.J_values( v_set, report.hsv );
+            
+            
+            
+            lambda = [1, 30];
+            J = lambda * x';
+            
+            cost_non_assignment = 100; % 40 pixel dalla prevision più 30 di color
+            % take min J idx
+            [m, n] = min( J ) ;
+            
+            if m < cost_non_assignment
+                % assign it to obj.ball
+                obj.image_coordinate{ end } = v_set.centers( n, :);
+                obj.radii{ end } = v_set.radii( n );
+                obj.bbox{ end } = bbox_from_circle( v_set.centers( n, : ), v_set.radii( n ), 'std' );
+                obj.state{ end } = "known";
+                obj.total_visible_count = obj.total_visible_count + 1;
+                obj.consecutive_invisible = 0;
                 
-                % get the n  closest to prediction,
-                n = 10;
-                v_set = obj.select_strongest_circles( n, report);
-                
-                % for every of them, compute J
-                x = obj.J_values( v_set, report.hsv );
-                
-                if size( x, 2) == 2
-                    lambda = [1, 30];
-                    J = lambda * x';
-                    
-                    cost_non_assignment = 70; % 40 pixel dalla prevision più 30 di color
-                    % take min J idx
-                    [m, n] = min( J ) ;
-                    
-                    if m < cost_non_assignment
-                        % assign it to obj.ball
-                        obj.image_coordinate{ end } = v_set.centers( n, :);
-                        obj.radii{ end } = v_set.radii( n );
-                        obj.bbox{ end } = bbox_from_circle( v_set.centers( n, : ), v_set.radii( n ), 'std' );
-                        obj.state{ end } = "known";
-                        obj.total_visible_count = obj.total_visible_count + 1;
-                        obj.consecutive_invisible = 0;
-                        
-                        r = 0.8;
-                        obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
-                        flag = 1;
-                    else
-                        flag = 0;
-                    end
+                r = 0.7;
+                obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
+                flag = 0;
+            else
+                if strcmp( obj.state{end}, "predicted" )
+                    obj.state{end} = "not_assigned";
+                else
+                    obj.state{end} = "unknown";
                 end
             end
-            
-            
         end
         
         function obj = discard_last( obj, varargin )
@@ -150,6 +147,14 @@ classdef history_tracker
                 obj.bbox{end} = [];
                 obj.state{end} = "unknown";
                 obj.consecutive_invisible = 1;
+            end
+        end
+        
+        function set_ = select_strongest( obj, quantity, report )
+            if strcmp( obj.state{end}, "predicted" )
+                set_ = obj.select_strongest_circles( quantity, report );
+            else % it is "not_assigned"
+                set_ = obj.select_strongest_blobs( quantity, report );
             end
         end
         
@@ -162,10 +167,6 @@ classdef history_tracker
             set_.connect = [];  % idx of s_set where it is connected to
             
             if report.foreground.c_number
-                %                 distances = zeros( f_set.length, 1);
-                %                 for idx = 1: f_set.length
-                %                     distances( idx ) = norm( obj.image_coordinate{end} - f_set.centers{ idx, : } ) ;
-                %                 end
                 distances=  obj.image_coordinate{end} - report.foreground.c_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
@@ -175,31 +176,11 @@ classdef history_tracker
                 set_.d_prev = distances;
                 set_.connect = zeros( set_.length, 1);
                 
-                %                 set_.length = min( quantity, report.foreground.c_number ) ;
-                %                 set_.centers{ set_.length, 1} = 0;
-                %                 set_.radii { set_.length, 1} = 0;
-                %                 set_.d_prev{ set_.length, 1} = 0;
-                %                 set_.connect{ set_.length, 1} = 0;
-                %                 idx = 1;
-                %                 max_ = max( distances) +1;
-                %                 while idx <= set_.length
-                %                     [m, n] = min( distances );
-                %
-                %                     %copy
-                %                     set_.centers{ idx } = f_set.centers{ n, : };
-                %                     set_.radii{ idx } = f_set.radii{ n };
-                %                     set_.d_prev{ idx } = m;
-                %                     set_.connect{ idx } = 0;
-                %
-                %                     % remove the used one
-                %                     distances( n ) = max_ ;
-                %                     idx = idx+1;
-                %                 end
             end
             
             % second one is s_set
             % I compute the distance of every of these circles to the
-            % ones of f_set i  close eneough
+            % ones of f_set. If close enough, I merge them.
             if report.stepper.c_number
                 distances=  obj.image_coordinate{end} - report.stepper.c_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
@@ -210,71 +191,6 @@ classdef history_tracker
                 set_.d_prev = [set_.d_prev; distances] ;
                 set_.connect = [set_.connect; zeros( report.stepper.c_number, 1)];
                 
-                %                 s_set = report.foreground;
-                %                 distances = zeros( set_.length, s_set.c_number);
-                %                 for jdx = 1:s_set.c_number
-                %                     for idx = 1: set_.length
-                %                         distances( idx, jdx ) = norm( s_set.centers( jdx , :) - set_.centers{ idx } ) ;
-                %                     end
-                %                 end
-                %
-                %                 kdx = min( set_.length, s_set.c_number ) ;
-                %                 numbers = 1:s_set.c_number;
-                %                 while kdx > 0 % and dim less then n
-                %                     [m, n] = min( distances , [], 'all', 'linear');
-                %                     if they intersect
-                %                     if m <= 2*obj.radii{ end }
-                %                         r = ceil( n/s_set.c_number ) ;
-                %                         c = n- (r-1)*s_set.c_number ;
-                %
-                %
-                %                         set_.connect{ r} = numbers(c);
-                %                         numbers(c) = [];
-                %
-                %                         distances(r, :) = [];
-                %                         distances(:, c) = [];
-                %
-                %
-                %                         s_set.length = s_set.c_number -1;
-                %                         s_set.centers(c, :) = [];
-                %                         s_set.radii(c, :) = [];
-                %                     end
-                %
-                %                     kdx = kdx-1;
-                %                 end
-                %
-                %                 If I still have some circles not been asigned I add the
-                %                 m to f_set
-                %                 if s_set.c_number
-                %                     distances = zeros( s_set.length, 1);
-                %                     for idx = 1: s_set.length
-                %                         distances( idx ) = norm( obj.image_coordinate{end} - s_set.centers{ idx, : } ) ;
-                %                     end
-                %                     distances=  obj.image_coordinate{end} - s_set.centers;
-                %                     distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
-                %
-                %                     idx = set_.length+1;
-                %                     set_.length = set_.length + min( quantity, s_set.c_number ) ;
-                %                     set_.centers{ set_.length, 1} = 0;
-                %                     set_.radii { set_.length, 1} = 0;
-                %                     set_.d_prev{ set_.length, 1} = 0;
-                %                     set_.strength{ set_.length, 1} = 0;
-                %
-                %                     max_ = max( distances) +1;
-                %                     while idx <= set_.length
-                %                         [m, n] = min( distances );
-                %
-                %                         copy
-                %                         set_.centers{ idx } = s_set.centers( n, : );
-                %                         set_.radii{ idx } = s_set.radii( n, : );
-                %                         set_.d_prev{ idx } = m;
-                %                         set_.connect{ idx } = 0;
-                %
-                %                         remove the used one
-                %                         distances( n ) = max_ ;
-                %                         idx = idx+1;
-                %                     end
-                %                 end
                 idx = 1;
                 while idx < set_.length
                     distances=  set_.centers(idx, :) - set_.centers( idx+1:end, :);
@@ -292,6 +208,7 @@ classdef history_tracker
                     idx = idx +1;
                 end
                 
+                % To save just the best requested results, I erase the worst ones.
                 if set_.length > quantity
                     idx = set_.length - quantity;
                     while idx
@@ -302,14 +219,52 @@ classdef history_tracker
                         set_.radii( M, : ) = [];
                         set_.connect( M, : ) = [];
                         set_.d_prev( M, : ) = [];
+                        idx = idx -1;
                     end
                 end
                 
             end
         end
         
-        function x = J_values( ~, v_set, color_mask )
+        function set_ = select_strongest_blobs( obj, quantity, report )
+            % allocate set_
+            set_.length = 0;
+            set_.centers = [];
+            set_.radii = [];
+            set_.d_prev = [];
+            set_.connect = [];  % idx of s_set where it is connected to
             
+            if report.stepper.b_number
+                distances=  obj.image_coordinate{end} - report.stepper.b_centers;
+                distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
+                
+                set_.length = report.stepper.b_number;
+                set_.centers =  report.stepper.b_centers ;
+                set_.radii =  report.stepper.b_radii;
+                set_.d_prev = distances ;
+                set_.connect = zeros( report.stepper.b_number, 1);
+            end
+            
+            % To save just the best requested results, I erase the worst ones.
+            if set_.length > quantity
+                idx = set_.length - quantity;
+                while idx
+                    [~, M] = max( set_.d_prev );
+                    
+                    set_.length = set_.length -1;
+                    set_.centers( M, : ) = [];
+                    set_.radii( M, : ) = [];
+                    set_.connect( M, : ) = [];
+                    set_.d_prev( M, : ) = [];
+                end
+            end
+        end
+        
+        function x = J_values( ~, v_set, color_mask)
+            if v_set.length == 0
+                x = [inf, inf];
+                return;
+            end
             % x1
             %             distance_from_prev = zeros( v_set.length, 1);
             %             for idx = 1: v_set.length
