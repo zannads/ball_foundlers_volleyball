@@ -96,17 +96,7 @@ for idx = 1:a_h.total
     
     name = strcat( 'detected_action_', num2str( idx ), '.mat' );
     
-    ball_foundlers_show( name, '2d', 'background', str_frame );
-    
-    msgbox( strcat('The image has been open. Press brush on the top right of the ', ...
-    'figure. Select the starting point of the trajectory and then right click ', ... 
-    'on it. Select export and then save the point as point_1. Same thing for the end', ...
-    'save it as point_2 instead.') );
-    
-    str = [];
-    while ~strcmp( str, 'y')
-        str = input( "Did you do it? ", 's');
-    end
+    ball_foundlers_extract_points( name, str_frame );
     
     ball_foundlers_convert2dto3d( name, 1, point_1, point_2 );
 end

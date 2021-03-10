@@ -6,37 +6,6 @@ end
 action = load( name );
 %num_points = action.frame{end};
 
-acquired = 0;
-while ~acquired
-    axis = input( "Insert constaint for point 1, AXIS: ", 's');
-    value = input( "at  ");
-    if strcmp( axis, 'x' )
-        x = value;
-        acquired = 1;
-    elseif strcmp( axis, 'y' )
-        y = value;
-        acquired = 1;
-    elseif strcmp( axis, 'z' )
-        z = value;
-        acquired = 1;
-    end
-end
-
-acquired = 0;
-while ~acquired
-    axis = input( "Insert constaint for point 2, AXIS: ", 's');
-    value = input( "at  ");
-    if strcmp( axis, 'x' )
-        x = value;
-        acquired = 1;
-    elseif strcmp( axis, 'y' )
-        y = value;
-        acquired = 1;
-    elseif strcmp( axis, 'z' )
-        z = value;
-        acquired = 1;
-    end
-end
 
 points = cell2mat( action.position );
 
