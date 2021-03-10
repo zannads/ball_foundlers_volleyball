@@ -103,7 +103,7 @@ classdef actions_handler
             obj.set.(name).position_y = [ floor( min(y)), ceil( max(y) ) ]; 
             close(f_h);
             disp( "Thank you :) ");
-            % for this moment always right, in future I can discriminate
+            % for this moment always right side, in future I can discriminate
             % better
             obj.set.(name).starting_side = 0;
             
@@ -117,15 +117,6 @@ classdef actions_handler
             disp( obj.set.(name).position_y );
             disp( " ");
             
-%             str = input( "Starting side :");
-%             obj.set.(name).starting_side = str;
-%
-%             str = input( "Starting position x :");
-%             obj.set.(name).position_x = str;
-%             
-%             str = input( "Starting position y :");
-%             obj.set.(name).position_y = str;
-%             
             str = input( "Ending time : ");
             obj.set.(name).ending_time = str;
             
@@ -139,7 +130,62 @@ classdef actions_handler
         function out = get_videoname( obj )
             out = obj.videoname;
         end
+       
+        function ball = start_action( obj )
+            % when the referee whistle the action begins
+            % Iìd like to use the template matcher, to find the first
+            % instance of the ball.
+            % now I just select it
+           current = obj.get( obj.idx() );
+           x = current.position_x; 
+           y = current.position_y;
+           
+            ball = history_tracker();
+            ball.starting_side = current.starting_side;
             
+            if( ball.starting_side == 0 ) % it's on the far side
+                %it should be visible
+            
+                ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
+                ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
+                ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
+                ball.state{end} = "known";
+                ball.length = 1;
+                ball.total_visible_count = 1;
+                ball.consecutive_invisible = 0;
+               
+                
+            else
+                % it's out of the picture or covered
+                
+            end
+        end
+        
+        function out = end_action( obj, ball )
+            %again, the referee whistle, ball has touched the ground. ended
+            %action
+            name = strcat( 'detected_action_', num2str( obj.idx() ), '.mat' );
+            
+            frame = cell( ball.length, 1);
+            position = cell( ball.length, 1);
+            
+            for idx = 1:ball.length
+                frame{idx} = idx;
+                
+                if strcmp( ball.state{idx}, 'unknown' )
+                    position{idx} = [];
+                else
+                    position{idx} = ball.image_coordinate{idx};
+                end
+            end
+            
+            save(  name, 'frame', 'position');
+                
+            out = [];
+        end
+        
+        
+        
     end
     
     methods (Static)

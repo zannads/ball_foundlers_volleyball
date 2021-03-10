@@ -41,48 +41,6 @@ classdef video_handler
             obj.old_report{1} = obj.report;
         end
         
-        function ball = start_action( ~ , starting_side,  x, y)
-            % when the referee whistle the action begins
-            % Iìd like to use the template matcher, to find the first
-            % instance of the ball.
-            % now I just select it
-           
-            ball = history_tracker();
-            ball.starting_side = starting_side;
-            
-            if( ball.starting_side == 0 ) % it's on the far side
-                %it should be visible
-            
-                ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
-                ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
-                ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
-                ball.state{end} = "known";
-                ball.length = 1;
-                ball.total_visible_count = 1;
-                ball.consecutive_invisible = 0;
-                
-                %                 % template matching
-                %                 target = imread( '/Users/denniszanutto/Downloads/target_image.jpg' );
-                %                 roi_right_side = [740, 0, 525, 240];
-                %
-                %                 figure; imshow(frame); hold on; rectangle( 'Position', roi_right_side, 'EdgeColor', 'red');
-                %
-                %
-                %                 pos = obj.template_matcher( rgb2gray( frame ), rgb2gray(target), roi_right_side );
-                %                 viscircles( pos, 5 );
-            else
-                % it's out of the picture or covered
-                
-            end
-        end
-        
-        function out = end_action( obj, ball )
-            %again, the referee whistle, ball has touched the ground. ended
-            %action
-            
-            
-            out = [];
-        end
         
         function obj = display_tracking( obj, ball, varargin )
             if( ~isempty( ball ) & ~isempty( ball.bbox{end} ) )

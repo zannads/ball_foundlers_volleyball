@@ -44,8 +44,11 @@ for idx = 1:a_h.total
     v_h.reader.CurrentTime = current.starting_time;
     v_h = v_h.next_frame();
     
+    %save for the end
+    str_frame = v_h.frame;
+    
     % I create the object to track the ball. 
-    ball = v_h.start_action( current.starting_side, current.position_x, current.position_y);
+    ball = a_h.start_action();
     % Startting positions are known, thus I'll show them.
     v_h = v_h.display_tracking( ball );
     
@@ -89,5 +92,21 @@ for idx = 1:a_h.total
     % referee has whistle again, ball has touched ground and the action is
     % ended. I save the history of the tracking and eventually show again the video to
     % increase speed. 
-    ball = v_h.end_action( ball );
+    ball = a_h.end_action( ball );
+    
+    name = strcat( 'detected_action_', num2str( idx ), '.mat' );
+    
+    ball_foundlers_show( name, '2d', 'background', str_frame );
+    
+    msgbox( strcat('The image has been open. Press brush on the top right of the ', ...
+    'figure. Select the starting point of the trajectory and then right click ', ... 
+    'on it. Select export and then save the point as point_1. Same thing for the end', ...
+    'save it as point_2 instead.') );
+    
+    str = [];
+    while ~strcmp( str, 'y')
+        str = input( "Did you do it? ", 's');
+    end
+    
+    ball_foundlers_convert2dto3d( name, 1, point_1, point_2 );
 end
