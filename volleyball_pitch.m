@@ -143,7 +143,7 @@ classdef volleyball_pitch
             %pitch
             %   Detailed explanation goes here
             % If one of the two lines doesn't exist do nothing
-            if ( line_1.is_valid() | line_2.is_valid() ) %#ok<OR2>
+            if ( ~line_1.is_valid() | ~line_2.is_valid() ) %#ok<OR2>
                 return;
             else
                 %assign the point to the right place

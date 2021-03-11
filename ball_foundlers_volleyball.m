@@ -3,21 +3,21 @@ file_dir = '/Users/denniszanutto/Downloads/Pallavolo_1.mp4';
 
 
 videoReader = VideoReader( file_dir);
-videoReader.CurrentTime = 130;
+%videoReader.CurrentTime = 130;
 video_frame      = readFrame(videoReader);
 
-peopleDetector = vision.PeopleDetector;
-[bboxes,scores] = peopleDetector(video_frame);
-video_frame = insertObjectAnnotation(video_frame,'rectangle',bboxes,scores);
+% peopleDetector = vision.PeopleDetector;
+% [bboxes,scores] = peopleDetector(video_frame);
+% video_frame = insertObjectAnnotation(video_frame,'rectangle',bboxes,scores);
 figure, imshow(video_frame)
-title('Detected people and detection scores');
+% title('Detected people and detection scores');
 
 
 im_g = rgb2gray(video_frame);
 % edgs = edge(im_g,'canny', [0.08, 0.2]);
 % figure;
 % imshow(edgs)
-%%
+%
 directions = 3;
 
 %super ok dire 1 e 2
@@ -172,7 +172,7 @@ while idx <= directions
     end
     
     idx = idx+1;
-    close all;
+    
 end
 
 real_pitch = volleyball_pitch();
@@ -209,3 +209,4 @@ cam = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
 [image_pitch_, error] = image_pitch.complete(P, real_pitch);
 
 %save stuff 
+save proj_mat.mat P
