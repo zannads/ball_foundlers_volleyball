@@ -96,7 +96,7 @@ for idx = 1:a_h.total
     
     name = strcat( 'detected_action_', num2str( idx ), '.mat' );
     
-    ball_foundlers_extract_points( name, str_frame );
+    [point_1, point_2] = ball_foundlers_extract_points( name, str_frame );
     
-    ball_foundlers_convert2dto3d( name, 1, point_1, point_2 );
+    ball_foundlers_convert2dto3d( name, point_1, point_2 );
 end

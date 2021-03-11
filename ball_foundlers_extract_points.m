@@ -61,6 +61,14 @@ point_2.z = [];
     end
     
     % I just miss 3d point!
+    % now I fix them
+    point_1.x = 9;
+point_1.y = 3;
+point_1.z = 2;
+
+point_2.x = 0;
+point_2.y = 4;
+point_2.z = 1.6;
     
     % struct
     % point
