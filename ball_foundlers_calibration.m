@@ -1,4 +1,4 @@
-a_h = actions_handler( cd, 'actions.mat');
+function a_h = ball_foundlers_calibration( a_h )
 
 videoReader = VideoReader( a_h.get_videoname );
 %videoReader.CurrentTime = 130;
@@ -212,3 +212,4 @@ a_h = a_h.set_camera_position( O );
 a_h = a_h.set_camera_rotation( R );
 a_h = a_h.set_camera_parameters( K );
 a_h.save_all;
+end

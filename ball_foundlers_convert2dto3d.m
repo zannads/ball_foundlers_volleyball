@@ -100,12 +100,17 @@ zL =  C_(2, 2:end);
 % line.
 %zL = interp2(x2, y2, z2, xL, yL);
 % Visualize the line.
+minz = min( point_1.z, point_2.z );
+xL = xL( zL>= minz );
+yL = yL( zL>= minz );
+zL = zL( zL>= minz );
+
 line(xL,yL,zL,'Color','k','LineWidth',3);
 
  pitch.draw();
  
  pose = rigid3d( data.R', data.O');
-cam = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
+[~] = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
 
 line(xL,yL,zL,'Color','k','LineWidth',3);
 

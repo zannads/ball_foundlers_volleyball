@@ -6,8 +6,6 @@ classdef actions_handler
         set = [];
         det = [];
         total = 0;
-        
-        
     end
     
     properties (Access=private)
@@ -129,12 +127,12 @@ classdef actions_handler
         
         function range3d = get_range( obj ) 
            if isempty( obj.camera_position )
-               range3d = [-9, 9, 0, 9, 0, 3];
+               range3d = [-9, 9, 0, 9, 0, 5];
            else
                c_x = obj.camera_position(1);
                c_y = obj.camera_position(2);
-               c_z = obj.camera_position(3);
-               range3d = [min( -9, c_x), max(9, c_x), min(0, c_y), max(9, c_y), 0, min(3, c_z)];
+               
+               range3d = [min( -9, c_x), max(9, c_x), min(0, c_y), max(9, c_y), 0, 5];
            end
         end
         

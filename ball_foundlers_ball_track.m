@@ -7,37 +7,16 @@
 % Motion based tracking is performed, using difference between frames and a
 % mixture of gaussians to detect the object with respect to the foreground.
 
-%% MAIN ALGORITHM
 
-% create actions handler to manage the actions of the game.
-a_h = actions_handler( cd, 'actions.mat');
-% create video handler to manage the reader and players for the video, it
-% also keeps memory of the last steps.
-v_h = video_handler( a_h.get_videoname );
-% create frame analyser to detect the best possible matches at every frame.
-f_a = frame_analyser();
 
-train_time = a_h.get_training_frames /v_h.reader.FrameRate;
-% I start by leaving the object frame analyser learning the background.
-v_h.reader.CurrentTime = train_time(1);
-count = 1;
-while v_h.reader.CurrentTime <= train_time(2)
-    if ~ mod( count, 100 )
-        disp( "Learning background" );
-    end
-    v_h.frame = readFrame(v_h.reader);
-    
-    mask = f_a.learn_background(v_h.frame, count);
-    count = count+1;
-end
-%%
+function [a_h, v_h, f_a] = ball_foundlers_ball_track( a_h, v_h, f_a, idx )
 % imfindcircles prints a warning when the circles we are looking for are
 % less then 5 pixels. Since ball is mostly around 10 pixels this message is
 % printed many times. 
 warning( 'off' );
 % To recognise the action another script should be used, in this case is
 % done by hand.
-for idx = 1:a_h.total
+
     % acquire the action
     current = a_h.get_action( idx );
     
@@ -93,7 +72,7 @@ for idx = 1:a_h.total
     % referee has whistle again, ball has touched ground and the action is
     % ended. I save the history of the tracking and eventually show again the video to
     % increase speed. 
-    [ball, a_h] = a_h.end_action( ball );
+    [~, a_h] = a_h.end_action( ball );
     
     
     
