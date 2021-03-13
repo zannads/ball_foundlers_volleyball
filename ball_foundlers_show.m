@@ -1,10 +1,9 @@
-function ball_foundlers_show( name, space, varargin )
-if ~ exist( name, 'file' )
+function ball_foundlers_show( data, space, varargin )
+if isempty( data.detected )
     return;
 end
-
-action = load( name );
-num_points = action.frame{end};
+data = data.detected;
+num_points = size(data.frame, 1);
 
 if strcmp( space, '2d' )
     figure;
@@ -15,7 +14,7 @@ if strcmp( space, '2d' )
         hold on;
         
         for idx = 1:num_points
-            x_y = action.position{idx};
+            x_y = data.position{idx};
             if ~isempty( x_y )
                 plot( x_y(1), x_y(2), 'or', 'LineWidth', 5, 'ButtonDownFcn', @point_select_callback);
             end
@@ -25,7 +24,7 @@ if strcmp( space, '2d' )
         hold on;
         
         for idx = 1:num_points
-            x_y = action.position{idx};
+            x_y = data.position{idx};
             if ~isempty( x_y )
                 plot( x_y(1), -x_y(2), 'or', 'LineWidth', 5, 'ButtonDownFcn', @point_select_callback);
             end

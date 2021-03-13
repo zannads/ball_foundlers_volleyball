@@ -17,10 +17,11 @@ v_h = video_handler( a_h.get_videoname );
 % create frame analyser to detect the best possible matches at every frame.
 f_a = frame_analyser();
 
+train_time = a_h.get_training_frames /v_h.reader.FrameRate;
 % I start by leaving the object frame analyser learning the background.
-v_h.reader.CurrentTime = (a_h.training_frames(1)-1)/v_h.reader.FrameRate;
+v_h.reader.CurrentTime = train_time(1);
 count = 1;
-while v_h.reader.CurrentTime < a_h.training_frames(2)/v_h.reader.FrameRate
+while v_h.reader.CurrentTime <= train_time(2)
     if ~ mod( count, 100 )
         disp( "Learning background" );
     end
@@ -38,14 +39,14 @@ warning( 'off' );
 % done by hand.
 for idx = 1:a_h.total
     % acquire the action
-    current = a_h.get( idx );
+    current = a_h.get_action( idx );
     
     % I go the right moment
     v_h.reader.CurrentTime = current.starting_time;
     v_h = v_h.next_frame();
     
     %save for the end
-    str_frame = v_h.frame;
+    start_frame = v_h.frame;
     
     % I create the object to track the ball. 
     ball = a_h.start_action();
@@ -92,11 +93,9 @@ for idx = 1:a_h.total
     % referee has whistle again, ball has touched ground and the action is
     % ended. I save the history of the tracking and eventually show again the video to
     % increase speed. 
-    ball = a_h.end_action( ball );
+    [ball, a_h] = a_h.end_action( ball );
     
-    name = strcat( 'detected_action_', num2str( idx ), '.mat' );
     
-    [point_1, point_2] = ball_foundlers_extract_points( name, str_frame );
     
-    ball_foundlers_convert2dto3d( name, point_1, point_2 );
+    ball_foundlers_convert2dto3d( a_h.get_complete_action, start_frame );
 end

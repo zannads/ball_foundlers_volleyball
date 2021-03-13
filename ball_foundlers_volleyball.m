@@ -1,8 +1,6 @@
-prog_dir = '/Users/denniszanutto/Documents/GitHub/ball_foundlers_volleyball';
-file_dir = '/Users/denniszanutto/Downloads/Pallavolo_1.mp4';
+a_h = actions_handler( cd, 'actions.mat');
 
-
-videoReader = VideoReader( file_dir);
+videoReader = VideoReader( a_h.get_videoname );
 %videoReader.CurrentTime = 130;
 video_frame      = readFrame(videoReader);
 
@@ -209,4 +207,8 @@ cam = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
 [image_pitch_, error] = image_pitch.complete(P, real_pitch);
 
 %save stuff 
-save proj_mat.mat P
+a_h = a_h.set_P( P );
+a_h = a_h.set_camera_position( O );
+a_h = a_h.set_camera_rotation( R );
+a_h = a_h.set_camera_parameters( K );
+a_h.save_all;

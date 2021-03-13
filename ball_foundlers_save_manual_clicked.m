@@ -1,26 +1,41 @@
-function pointout = ball_foundlers_save_manual_clicked( setpoint )
+function pointout = ball_foundlers_save_manual_clicked( command, varargin )
     persistent point;
+    persistent mem;
     persistent p_;
     
-    if isempty( setpoint )
-        pointout = point;
-        point = zeros(2,2);
-        p_ = 0;
-        return;
-    end
     
-    if isempty( point ) | isempty( p_ )  
-        point = zeros(2,2);
+    
+    if isempty( point ) | isempty( p_ )  | isempty ( mem )
+        mem = 0;
+        point = zeros( mem  , 2);
         p_ = 0;
     end
 
-    if p_ == 0 | p_ == 2
-        p_ = 1;
-    else 
-        p_ = 2;
+    if strcmp( command, 'reset' )
+        mem = 0;
+        point = zeros( mem  , 2);
+        p_ = 0;
+        pointout = [];
+        
+    elseif strcmp( command, 'set' )
+        mem = varargin{1};
+        point = zeros( mem  , 2);
+        p_ = 0;
+        pointout = [];
+        
+    elseif strcmp( command, 'add' )
+        if p_< mem
+            p_ = p_ +1;
+            
+            point( p_, :) = varargin{1};
+        end
+        pointout = point;
+        
+    elseif strcmp( command, 'is_acquired' )
+       if p_ == mem
+           pointout = point;
+       else
+           pointout = [];
+       end
     end
-    
-    point( p_ , : ) = setpoint;
-    
-    pointout = point;
 end

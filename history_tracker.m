@@ -168,6 +168,7 @@ classdef history_tracker
                     set_.radii( M, : ) = [];
                     set_.connect( M, : ) = [];
                     set_.d_prev( M, : ) = [];
+                    idx = idx -1;
                 end
             end
         end
