@@ -1,26 +1,37 @@
 classdef history_tracker
-    %history_tracker Summary of this class goes here
-    %   Detailed explanation goes here
+    %HISTORY-TRACKER Class that stores and compute the informations for the
+    %tracking of the volleyball. 
+    %   It keeps the memory of the tracking and also validte the tracking
+    %   during the process.
     
     properties
-        image_coordinate;
-        radii;
-        %hsv_scale;
-        bbox;
-        state;
-        total_visible_count;
-        consecutive_invisible;
-        length;
-        starting_side;
+        image_coordinate;           % where the ball is detected/predicted during tracking
+        radii;                      % radius of the ball during tracking
+        bbox;                       % bbox of the ball during tracking
+        state;                      % state of the ball at that time instant:
+                                    %    - known : for sure or with high
+                                    %    probability - predicted : first
+                                    %    step of assignement is predict the
+                                    %    location - not_assigned : is still
+                                    %    predicted but no circle has been
+                                    %    found to match - unknown : this is
+                                    %    the predicted location, but not
+                                    %    even blob matches have been found,
+                                    %    thus it is hard to trust
+        total_visible_count;        % how many times the ball has been "known" in the history
+        consecutive_invisible;      % how many consecutive steps the ball has been "unknown"
+        length;                     % how many frame has been tracked
+        starting_side;              % which side of the pitch the ball starts
         
-        speed;
+        speed;                      % speed of the ball, useful only during tracking for prediction
         
     end
     
     methods
         function obj = history_tracker()
-            %UNTITLED3 Construct an instance of this class
-            %   Detailed explanation goes here
+            %HISTORY_TRACKER Construct an instance of this class
+            %   No informations are needed it just creates the object and
+            %   allocate the first space.
             obj.image_coordinate{1} = [];
             obj.radii{1} = [];
             obj.bbox{1} = [];
@@ -35,8 +46,8 @@ classdef history_tracker
         
         % ok add, mai usata
         function obj = add(obj,varargin)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
+            %ADD adds a new detection on the object 
+            
             if nargin == 1
                 obj.image_coordinate{end + 1} = [];
                 obj.bbox{end + 1} = [];
@@ -45,19 +56,21 @@ classdef history_tracker
                 obj.length = obj.length + 1;
                 %unchanged obj.total_visible_count;
                 obj.consecutive_invisible = obj.consecutive_invisible +1;
+                
             else
                 obj.image_coordinate{end + 1} = varargin{1};
                 obj.bbox{end + 1} = varargin{2};
                 obj.state{end + 1} = varargin{3};
                 obj.length = obj.length + 1;
+                
             end
         end
         
-        %ok predict
+        %% prediction
         function obj = predict_location( obj  )
+            %PREDICT_LOCATION Based on history predicts the new step
             
-            % se il precedente è known o predicted
-            % se il pre preceente è unknown o non esiste
+            % if previous is unknown or is the beginning predict in the
             % same point
             if obj.length == 1 | strcmp ( obj.state{end-1}, "unknown" )
                 % repeat the same point
@@ -74,22 +87,20 @@ classdef history_tracker
             end
             
             
-            % altrimenti
-            %liinear interp
+            % otherwise
+            %liinear interp with old points
             
+            % frame rate for speed
             d_t = 1/25;
             current.radii = obj.radii{end};
             current.bbox = obj.bbox{end};
             current.image_coordinate = obj.image_coordinate{end};
             
-            %             previous.bbox = obj.bbox{end-1};
-            %             previous.image_coordinate = obj.image_coordinate{end-1};
-            %
-            %costant speed costant direction
-            %obj.image_coordinate{end+1} = current.image_coordinate + (current.image_coordinate - previous.image_coordinate);
+            %costant speed costant direction 
+            % 2 step ahead because speed is always a step behind 
             obj.image_coordinate{end+1} = current.image_coordinate + obj.speed*d_t*2;
             
-            
+            % save the prediction
             obj.radii{end +1} = current.radii;
             obj.bbox{end+1} = bbox_from_circle( current.image_coordinate, current.radii, 'std');
             obj.state{end+1} = "predicted";
@@ -98,9 +109,13 @@ classdef history_tracker
             obj.consecutive_invisible = obj.consecutive_invisible + 1;
         end
         
+        %% Assignment
         function [obj, flag] = assignment(  obj, report )
+            %ASSIGNMENT Assign from the report the best match to the last
+            %predicted position
             flag = 1;
             if strcmp( obj.state{end}, "known" )
+                % if it's known I'm ok with that
                 return;
             end
             
@@ -108,18 +123,18 @@ classdef history_tracker
             n = 10;
             v_set = obj.select_strongest( n, report);
             
-            % for every of them, compute J
+            % for every of them, compute J as cost function
             x = obj.J_values( v_set, report.hsv );
-            
-            
-            
             lambda = [1, 30];
             J = lambda * x';
             
-            cost_non_assignment = 100; % 40 pixel dalla prevision più 30 di color
+            % cost of marking the prediction wrong
+            cost_non_assignment = 100; % 70 pixel from prevision and 30 of color
             % take min J idx
             [m, n] = min( J ) ;
             
+            % so if the best match is good enough then I decide it is the
+            % ball
             if m < cost_non_assignment
                 % assign it to obj.ball
                 obj.image_coordinate{ end } = v_set.centers( n, :);
@@ -129,10 +144,13 @@ classdef history_tracker
                 obj.total_visible_count = obj.total_visible_count + 1;
                 obj.consecutive_invisible = 0;
                 
+                % update also speed like it were a Kalman filter, thus I
+                % keep memory of the speed
                 r = 0.7;
                 obj.speed = r*obj.speed + (1-r)*(obj.image_coordinate{ end } -obj.image_coordinate{ end-1 } )*25;
                 flag = 0;
             else
+                % switch the state of the prediciton
                 if strcmp( obj.state{end}, "predicted" )
                     obj.state{end} = "not_assigned";
                 else
@@ -142,6 +160,9 @@ classdef history_tracker
         end
         
         function obj = discard_last( obj, varargin )
+            %DISCARD_LAST remove the last object in the history
+            % Two reason may be why we want it to be deleted. because we
+            % want to (forced) because we lost the ball too many steps ago
             if ( nargin > 2 & strcmp(varargin{1}, "forced")) | (obj.consecutive_invisible > 10)
                 obj.image_coordinate{1} = [];
                 obj.bbox{end} = [];
@@ -151,13 +172,20 @@ classdef history_tracker
         end
         
         function set_ = select_strongest( obj, quantity, report )
+            %SELECT_STRONGEST From report select the strongest circles or
+            %bbox that matches the prediction
             if strcmp( obj.state{end}, "predicted" )
+                % if still rpedicted look for circles 
                 set_ = obj.select_strongest_circles( report );
+                
             else % it is "not_assigned"
+                % if not assigned I've already looked for circle now I'll
+                % look for bbox
                 set_ = obj.select_strongest_blobs( report );
             end
             
             % To save just the best requested results, I erase the worst ones.
+            % also keeps the number limited
             if set_.length > quantity
                 idx = set_.length - quantity;
                 while idx
@@ -174,17 +202,26 @@ classdef history_tracker
         end
         
         function set_ = select_strongest_circles( obj, report  )
+            %SELECT_STRONGEST_CIRCLES Extract the most closed to prediction
+            %circles
+            
             % allocate set_
             set_.length = 0;
             set_.centers = [];
             set_.radii = [];
             set_.d_prev = [];
-            set_.connect = [];  % idx of s_set where it is connected to
+            set_.connect = [];  % idx of circles in stepper that are 
+                                % connected to those of foreground 
             
+            % first I analyse the foreground
             if report.foreground.c_number>0
+                % if something has been found
+                
+                % get the distances from prevision
                 distances=  obj.image_coordinate{end} - report.foreground.c_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
+                % format the matches
                 set_.length = report.foreground.c_number;
                 set_.centers = report.foreground.c_centers;
                 set_.radii = report.foreground.c_radii;
@@ -193,26 +230,33 @@ classdef history_tracker
                 
             end
             
-            % second one is s_set
+            % second one is stepper
             % I compute the distance of every of these circles to the
             % ones of f_set. If close enough, I merge them.
             if report.stepper.c_number>0
+                % compute distances from prevision
                 distances=  obj.image_coordinate{end} - report.stepper.c_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
+                % add them to matches 
                 set_.length = set_.length + report.stepper.c_number;
                 set_.centers = [set_.centers; report.stepper.c_centers];
                 set_.radii = [set_.radii; report.stepper.c_radii];
                 set_.d_prev = [set_.d_prev; distances] ;
                 set_.connect = [set_.connect; zeros( report.stepper.c_number, 1)];
                 
+                % now remove circle that should represent them. Two circles
+                % are defined as the same if, the intersect
                 idx = 1;
                 while idx < set_.length
+                    % distance bewteen the two circles
                     distances=  set_.centers(idx, :) - set_.centers( idx+1:end, :);
                     distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                     
                     [m, n] = min( distances );
+                    % if less then diameter they are intersecting
                     if m < 2*obj.radii{end}
+                        % remove the second one
                         set_.connect( idx ) = idx + n - report.foreground.c_number;
                         set_.length = set_.length -1;
                         set_.centers( idx + n, : ) = [];
@@ -226,17 +270,25 @@ classdef history_tracker
         end
         
         function set_ = select_strongest_blobs( obj, report )
-            % allocate set_
+            % SELECT_STRONGEST_BLOBS Select the best blob that matches the
+            % prediction of the ball
+            
+            % create struct set_
             set_.length = 0;
             set_.centers = [];
             set_.radii = [];
             set_.d_prev = [];
-            set_.connect = [];  % idx of s_set where it is connected to
+            set_.connect = [];  
             
+            % just on the stepper!! 
             if report.stepper.b_number>0
+                % if something exist
+                
+                % get distances
                 distances=  obj.image_coordinate{end} - report.stepper.b_centers;
                 distances = sqrt( distances(:,1).^2 + distances(:,2).^2 );
                 
+                %add to the structure
                 set_.length = report.stepper.b_number;
                 set_.centers =  report.stepper.b_centers ;
                 set_.radii =  report.stepper.b_radii;
@@ -248,14 +300,20 @@ classdef history_tracker
         end
         
         function x = J_values( ~, v_set, color_mask)
+            %J_VALUES Create the variables to compute the cost function
             if v_set.length == 0
+                % if nothing present set to infinity
+                
                 x = [inf, inf];
                 return;
             end
+            
             % x1
+            % parameter 1 is distance from prevision
             distance_from_prev = v_set.d_prev ;
             
             % x5
+            % parameter 2 is how much yellow there is in the bbox
             color_ratio = zeros( v_set.length, 1);
             for idx = 1: v_set.length
                 [mask, ~, ~] = extract_roi( color_mask, v_set.centers( idx, : ), v_set.radii( idx ) );
@@ -263,21 +321,26 @@ classdef history_tracker
                 color_ratio(idx) = 1 - sum( mask, 'all' )/ ( size(mask, 1)* size(mask, 2) );
             end
             
+            % place them
             x = [ distance_from_prev, color_ratio ];
-            
         end
         
+        %% recovery
         function out = is_lost( obj )
+            %OUT_LOST Returns if in the last 3 steps the ball is unknown. 
+            
             st_1 = obj.state{end};
             st_2 = obj.state{end-1};
             st_3 = obj.state{end-2};
             
             comp = "unknown";
-            
+            % compare
             out = ( strcmp( st_1, comp) & strcmp( st_2, comp) & strcmp( st_3, comp) );
         end
         
+        
         function obj = recover( obj , infos )
+            % RECOVER Prepared for recovery of the lost ball 
             steps = size(infos, 1);
             
             figure;

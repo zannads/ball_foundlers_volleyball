@@ -6,23 +6,23 @@ classdef frame_analyser
     %   makes it easy to be recognised.
     %   This techniques includes:
     %   - Mixture of gaussian to learn the background.
-    %   - blob analyser system object to recognize the moving objects.
-    %   - analysis of subsequent frames to detect fast moving objects.
-    %   - hsv space color analysis.
+    %   - Blob analyser system object to recognize the moving objects.
+    %   - Analysis of subsequent frames to detect fast moving objects.
+    %   - HSV space color analysis.
     
     properties (Access=private)
         % Look at the constructor for more info.
-        f_detector = [];
-        blob_analyser = [];
-        h_tracker = [];
-        block_matcher = [];
-        template_matcher = [];
+        f_detector = [];            % Foreground detector
+        blob_analyser = [];         % Blob analyser
+        h_tracker = [];             % Histogram tracker (not used)
+        block_matcher = [];         % Block matcher (not used)
+        template_matcher = [];      % Template matcher (not used)
         
-        report = [];
-        debug = 0;
+        report = [];                % Report created
+        debug = 0; 
         
         % default Params
-        num_gaussians  = 5;
+        num_gaussians  = 5;        
         minimum_back_ratio = 0.7;
         adapt_learning_rate = 0;
         train_frames = 500;
@@ -33,7 +33,7 @@ classdef frame_analyser
     methods
         %% Constructor
         function obj = frame_analyser()
-            % Create System objects analysis.
+            %FRAME_ANALYSER Create System objects analysis.
             
             % The foreground detector is used to segment moving objects from
             % the background. It outputs a binary mask, where the pixel value
@@ -41,9 +41,15 @@ classdef frame_analyser
             % to the background.
             
             if obj.adapt_learning_rate
+                % If adapt learning rate is active the first frames are
+                % used to train the object and then it keeps uploading the
+                % model.
                 obj.f_detector = vision.ForegroundDetector('NumGaussians', obj.num_gaussians, ...
                     'NumTrainingFrames', obj.train_frames, 'MinimumBackgroundRatio', obj.minimum_back_ratio);
             else
+                % When this properties is set to zero I can pass to the
+                % system object also the learning rate and then make it not
+                % learning during tracking.
                 obj.f_detector = vision.ForegroundDetector('NumGaussians', obj.num_gaussians, ...
                     'AdaptLearningRate', obj.adapt_learning_rate, 'MinimumBackgroundRatio', obj.minimum_back_ratio);
             end
@@ -57,7 +63,9 @@ classdef frame_analyser
                 'AreaOutputPort', true, 'CentroidOutputPort', true, ...
                 'MinimumBlobArea', obj.min_area, 'MaximumBlobArea', obj.max_area);
             
-            %             start_image = imread( '/Users/denniszanutto/Downloads/start_image.jpg');
+            % Histogram based tracking tracks an object following the hsv
+            % space of that element. In this case it doens't work because
+            % the ball doesn't have a fixed color.
             %             start_image_hsv = rgb2hsv(start_image);
             %             ball_starting_region = [290, 190, 16, 16];
             %             % using hsv tracking I create the object histogram
@@ -65,16 +73,20 @@ classdef frame_analyser
             %             initializeObject(obj.h_tracker, start_image_hsv(:,:,1) , ball_starting_region);
             %
             
-            % using difference between frames
+            % Block matcher object find the moving object between two
+            % frames. Could have been useful, but ball is too small.
             %             obj.block_matcher = vision.BlockMatcher('ReferenceFrameSource',...
             %                 'Input port','BlockSize',[720 1280]);
             %             obj.block_matcher.OutputValue = 'Horizontal and vertical components in complex form';
             %
-            % template matching for start of the action
+            % Template matching can be useful to detect the ball at the
+            % beginning. It is really heavy computationally speaking.
+            % Unfortunately ball is too far and doesn't have any particular
+            % feature.
             %             obj.template_matcher = vision.TemplateMatcher('ROIInputPort', true, ...
             %                 'BestMatchNeighborhoodOutputPort', true);
             %
-            % the structure of the report is the following one:
+            % The structure of the report is the following one:
             %   - for foreground analysis and step (difference between frames):
             %       - mask: binary image obtained from the techinque.
             %       - c_number: number of found circles.
@@ -109,17 +121,16 @@ classdef frame_analyser
             
             % Step detecion
             obj.report.stepper.mask = obj.step_analysis( frame, old_frame);
-            
             obj = obj.circle_search( 'stepper', last_known );
             
             % Color space detection.
             obj.report.hsv = obj.hsv_analysis( frame );
             % no circle search
         end
-        
+        %%
         function obj = deepen_report( obj, last_known )
             %DEEPEN_REPORT Analysis of the frame for blob detection when
-            %circle search has failed.
+            %circles search has failed.
             % This method searches for blobs that can be connected to the
             % ball using the 3 masks already computed.
             
@@ -132,6 +143,7 @@ classdef frame_analyser
             %FOREGROUND_ANLYSIS_BLOBANALYSER Perform recognition of bboxes
             %using blob analyser.
             
+            % This method hasn't been used anymore.
             % Detect foreground.
             set.mask = obj.f_detector.step(frame);
             
@@ -169,8 +181,11 @@ classdef frame_analyser
         function [mask] = foreground_analysis( obj, frame)
             % Detect foreground.
             if obj.adapt_learning_rate
+                % if it does it autonomously you pass just the frame.
                 mask = obj.f_detector.step(frame);
             else
+                % Otherwise also a very small learning rate so that it is
+                % not learning.
                 l_r = 0.000000001;
                 mask = obj.f_detector.step(frame, l_r);
             end
@@ -199,13 +214,17 @@ classdef frame_analyser
         end
         
         function [mask] = hsv_analysis ( obj, frame ) %#ok<INUSL>
+            %HSV_ANALYSIS Search in the image for yellow
             % try to look for yellows
             color = [0.15, 0.25];
             
+            % move to hsv space
             hsv_frame = rgb2hsv(frame);
             
+            % Create the mask
             mask = ( hsv_frame(:,:,1) > min(color) & hsv_frame(:,:,1) < max(color));
             
+            % Apply morphological operations to remove noise and fill in holes.
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
@@ -215,8 +234,14 @@ classdef frame_analyser
         end
         
         function [mask] = step_analysis( obj, frame, old_frame ) %#ok<INUSL>
-            %analysis between subsequnet frames
+            %STEP_ANALYSIS Performs the analysis between two subsequent
+            %frames
+            
+            % take just the pixel where there is a change in color big
+            % enough.
             mask = sum( abs( old_frame-frame ), 3 ) > 20;
+            
+            % Apply morphological operations to remove noise and fill in holes.
             mask = imopen(mask, strel('rectangle', [3,3]));
             mask = imclose(mask, strel('rectangle', [15, 15]));
             mask = imfill(mask, 'holes');
@@ -226,26 +251,46 @@ classdef frame_analyser
         end
         
         function obj = circle_search( obj, who, last_known  )
+            %CIRCLE_SEARCH Searches for circle on the requested mask. 
+            
+            % get the mask
             mask = obj.report.(who).mask;
             
+            % Concentrate on the 200 x 200 square around the last position 
+            % Get the reduced mask and the shift of its high-left point
             [mask, v_x, v_y] = extract_roi( mask, last_known.position, 100 );
+            
+            % Get the actual radius to search for circle of a similar
+            % dimension. from m_r to M_r. with a limit [3, 15]
             radius = last_known.radii;
             m_r = min( max( floor(0.5*radius), 3), 10) ;
             M_r = max( min( ceil(1.5*radius), 15), 5);
+            
+            % find circles
             [centers, radii] = imfindcircles(mask, [m_r, M_r]);
             
+            % if at least one circle has been found.
             l = size( centers, 1);
             if l
+                % save the number of circles 
                 obj.report.(who).c_number = l;
+                % shift them on the original coordinates of the big mask.
                 obj.report.(who).c_centers = centers + [v_x, v_y];
                 obj.report.(who).c_radii = radii;
             end
         end
         
         function obj = blob_search( obj, who, last_known )
+            %BLOB_SEARCH Search for blob objects in the request mask. 
+            
+            % get the mask
             mask = obj.report.(who).mask;
             
+            % Concentrate on the 200 x 200 square around the last position 
+            % Get the reduced mask and the shift of its high-left point
             [mask, v_x, v_y] = extract_roi( mask, last_known.position, 150 );
+            
+            % Blob analysis 
             stats = regionprops('struct', mask ,'Area', 'BoundingBox', 'Centroid',...
                 'Circularity', 'MajorAxisLength', 'MinorAxisLength', 'Orientation' );
            
@@ -253,34 +298,32 @@ classdef frame_analyser
            idx = 1;
             while ~isempty(stats) & idx <= size( stats, 1)
                 if ( stats(idx).Area > 600 | stats(idx).Area < 100 | stats(idx).Circularity < 0.3 )
+                    % if area is too putside the range 100-600 or
+                    % circularity is not enough. false positive.
                     stats(idx) = [];
                 else 
                     idx = idx + 1;
                 end
             end
             
+            % Get the numebr of detection still present.
             l = (size( stats , 1)*( ~isempty(stats) )) > 0;
             if l
+                % save the number.
                 obj.report.(who).b_number = size( stats , 1);
+                % save coordinates and shift them in the original mask
                 obj.report.(who).b_centers = extractfield_( stats, 'Centroid') + [v_x, v_y];
                 obj.report.(who).b_radii = extractfield_( stats, 'MajorAxisLength')/2;
-                
-                if obj.debug
-                    figure; imshow(mask);
-                    r = extractfield_( stats, 'BoundingBox');
-                    for idx = 1:size(r, 1)
-                    rectangle( 'Position',r(idx,:) , 'EdgeColor', 'yellow');
-                    end
-                end
+               
             end
             
         end
         
         function [out] = get_report( obj )
+            %GET_REPORT Give back the report.
             out = obj.report;
         end
         
         
     end
 end
-

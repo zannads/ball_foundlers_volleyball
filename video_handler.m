@@ -1,39 +1,42 @@
 classdef video_handler
-    %VIDEO_HANDLER Summary of this class goes here
+    %VIDEO_HANDLER Class to handle video reader and player. Plus it keeps
+    %some memory for fast recovery of the informations.
     %   Detailed explanation goes here
     
     properties
-        reader = [];
-        player = [];
+        reader = [];    % Video reader.
+        player = [];    % Video player.
         
-        memory = 3;
-        old_frame = cell(0);
-        frame = [];
-        report = [];
-        old_report = cell(0);
+        % The memory of the system has been included in case the ball was to
+        % recover after being lost to avoid to recompute everything since
+        % it is the most computational heavy part. 
+        memory = 3;             % Memory of the system.
+        old_frame = cell(0);    % Memory of the frames. 
+        frame = [];             % Current frame.
+        report = [];            % Current report. 
+        old_report = cell(0);   % Memory of the reports.
         
         debug = 0;
     end
     
     methods
         function obj = video_handler(video_directory)
-            % Initialize Video I/O
-            % Create objects for reading a video from a file, drawing the tracked
-            % objects in each frame, and playing the video.
-            obj.reader = VideoReader( video_directory );
+            %VIDEO_HANDLER Allocate the space for the properites and setup
+            %the objects.
             
-            %   obj.reader.CurrentTime = 180;
-            % Create two video players, one to display the video,
-            % and one to display the foreground mask.
-            % obj.mask_player = vision.VideoPlayer('Position', [740, 400, 700, 400]);
+            % Initialize Video reader.
+            obj.reader = VideoReader( video_directory );
+           
+            % Initialize the video player.
             obj.player = vision.VideoPlayer('Position', [20, 400, 720, 1280]);
             
+            % Initialize the memory. 
             obj.old_frame = cell( obj.memory, 1 );
             obj.old_report = cell( obj.memory, 1);
         end
         
         function obj = update_old( obj )
-            %update old frame for step analysis
+            %UPDATE_OLD Save old frames and reports in memories.
             obj.old_frame = [obj.old_frame(1); obj.old_frame(1:2)]; 
             obj.old_frame{1} = obj.frame;
             
@@ -43,40 +46,47 @@ classdef video_handler
         
         
         function obj = display_tracking( obj, ball, varargin )
+            %DISPLAY_TRACKING Display the video with the ball position. 
+            
             if( ~isempty( ball ) & ~isempty( ball.bbox{end} ) )
+                % Contour of the ball. 
                 tframe = insertObjectAnnotation(obj.frame, 'rectangle', ...
                     ball.bbox{end}, ball.state{end});
                 
+                % During debug also show the detection of the imfindcircle
+                % method.
                 if obj.debug & nargin > 2
                     f_prop = varargin{1};
                     s_prop = varargin{2};
+                    
                     if s_prop.length > 0
                     tframe = insertObjectAnnotation(tframe, 'circle', ...
                         [cell2mat(s_prop.centers), cell2mat(s_prop.radii)], "s", 'Color', 'red');
+                    
                     end
                     if f_prop.length > 0
                     tframe = insertObjectAnnotation(tframe, 'circle', ...
                         [cell2mat(f_prop.centers), cell2mat(f_prop.radii)], "f", 'Color', 'green');
-                    end
                     
+                    end
                 end
-                % Draw the objects on the mask.
-                %                 mask = insertObjectAnnotation(mask, 'rectangle', ...
-                %                     bboxes, label);
             end
-            % Display the mask and the frame.
-            %obj.mask_player.step(mask);
+            
+            % Display the frame
             obj.player.step(tframe);
         end
         
         function obj = next_frame( obj )
+            %NEXT_FRAME Gets the next frame and save the old one.
             obj = obj.update_old();
             
             obj.frame = readFrame( obj.reader );
-            
         end
         
         function infos = prepare_for_recovery( obj )
+            %PREPARE_FOR_RECOVERY Thi method format the memory of the
+            %object for recovery in case the ball is lost. This
+            %informations have to be used outside.
             frames = cell(4, 1);
             frames{1} = obj.frame; 
             frames(2:end) = obj.old_frame;

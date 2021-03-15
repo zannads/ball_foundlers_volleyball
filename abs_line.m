@@ -1,5 +1,5 @@
 classdef abs_line
-    %abs_line ad hoc class for 2d line
+    %ABS_LINE ad hoc class for 2d line
     %   To shorten some steps I created a class that fits the way I want to
     %   code
     
@@ -12,10 +12,10 @@ classdef abs_line
     methods
         
         function obj = abs_line( varargin )
-            %abs_line can have only the line as input or the line and two
-            % points on it. 
-            %   if it is just the line it finds the two points crossing
-            %   with the axis
+            %ABS_LINE Create an istane of this class
+            % It can have only the line as input or the line and two points
+            % on it. If it is just the line it finds the two points
+            % crossing with the axis
             if nargin == 1
                 line_ = varargin{1};
                 obj.params = line_ ;
@@ -33,7 +33,8 @@ classdef abs_line
         end
         
         function obj = acquire_from_image(obj)
-            %acquire from image for when I need to pick it manually
+            %ACQUIRE_FROM_IMAGE Acquire a line by manually drawing it.
+            %when I need to pick it manually
             figure(gcf);
             segment1 = drawline('Color','b');
             obj.p1 = [ (segment1.Position(1, :))' ;  1];
@@ -43,10 +44,10 @@ classdef abs_line
         end
         
         function obj = draw(obj, varargin)
-            %draw the line in current figure
-            % additional inputs couple name value like professionists do :)
+            %DRAW Draw the line in current figure
+            % additional inputs couple name value 
             % figure handler
-            % Insideborders for draw a lin ethat goes from one border to
+            % Insideborders for draw a line that goes from one border to
             % the other of the image
             % usual stuff, color and thickness
             f_h = figure(gcf);
@@ -57,9 +58,11 @@ classdef abs_line
             idx = 1;
             while idx < (nargin-1)
                 if(strcmp( varargin{idx} , "at") )
+                    % if the figure handler is passed use it
                     f_h = varargin{idx+1};
                     
                 elseif ( strcmp( varargin{idx}, 'insideBorder') )
+                    % if is requested to draw between the lines
                     x_limit = varargin{4}(2);
                     y_limit = varargin{4}(1);
                     p(:, 1) = cross( [1; 0; 0], obj.params );
@@ -79,9 +82,13 @@ classdef abs_line
                     end
                     
                 elseif(strcmp( varargin{idx} , 'Color') )
+                    % required color 
                     color = varargin{idx+1};
+                    
                 elseif(strcmp( varargin{idx} , 'LineWidth') )
+                    % required thickness
                     thickness = varargin{idx+1};
+                    
                 end
                 idx = idx+2;
             end
@@ -93,21 +100,21 @@ classdef abs_line
         end
         
         function outputArg = intersection(obj,obj2)
-            %intersection cross between two lines is a point
+            %INTERSECTION intersection between two lines is a point
             %   Just uses the two lines as objects to find where they cross
             outputArg = cross(obj.params, obj2.params);
             outputArg = outputArg/outputArg(3);
         end
         
         function obj = normalize (obj )
-            %normalize coordinates
+            %NORMALIZE normalizes coordinates
             obj.params = obj.params ./ obj.params(3);
             obj.p1 = obj.p1 ./ obj.p1(3);
             obj.p2 = obj.p2 ./ obj.p2(3);
         end
         
         function obj = transform (obj, H) 
-            %apply transformation H
+            %TRANSFORM Apply transformation H
             % in this way it was easyer to write in the main program so I
             % don't do mistakes in treating lines as points
            obj.params = inv(H)' * obj.params ;
@@ -116,7 +123,7 @@ classdef abs_line
         end
         
         function obj = reset_point (obj, line, varargin)
-            %reset points find new point for the line as intersection
+            %RESET_POINT find new point for the line as intersection
             %between the line itself and the one given
                if( nargin> 2 && varargin{1} == 1) 
                    obj.p1 = cross( obj.params, line);
@@ -128,6 +135,7 @@ classdef abs_line
         end
         
         function y_n = is_valid( obj )
+            %IS_VALID I should not use the point at the infinty as a line
            if( sum(obj.params == [0, 0, 1]') ~=3 )
                y_n = 1;
            else

@@ -17,9 +17,7 @@ classdef volleyball_pitch
             % A'' and F'' bottom of the net
             % If is real don't insert anything, otherwise insert something
             % just to know
-            
-            
-            
+
             if nargin >0
                 obj.image_tp = varargin{1};
             else
@@ -46,7 +44,7 @@ classdef volleyball_pitch
         
         function  draw(obj)
             %DRAW Draw the pitch
-            %   Detailed explanation goes here
+            % Creates a pitch on the new figure.
             if(  obj.image_tp == 0 )
                 figure;
                 %Draw from each point on the ground to the next one
@@ -139,9 +137,10 @@ classdef volleyball_pitch
         end
         
         function  obj = add_point(obj,line_1, line_2, letter )
-            %ADD_POINT give new coordinates for a pitch only for image
+            %ADD_POINT give new coordinates for a pitch( only for image
+            %pitches)
             %pitch
-            %   Detailed explanation goes here
+            
             % If one of the two lines doesn't exist do nothing
             if ( ~line_1.is_valid() | ~line_2.is_valid() ) %#ok<OR2>
                 return;
