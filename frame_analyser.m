@@ -19,7 +19,6 @@ classdef frame_analyser
         template_matcher = [];      % Template matcher (not used)
         
         report = [];                % Report created
-        debug = 0; 
         
         % default Params
         num_gaussians  = 3;        

@@ -116,8 +116,11 @@ line(xL,yL,zL,'Color','k','LineWidth',3);
 %now draw just the pitch
 pitch.draw();
 % the camera
-pose = rigid3d( data.R', data.O');
-[~] = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
+a = ver( 'MATLAB' );
+if ~strcmp( a.Release, '(R2019b)')
+    pose = rigid3d( data.R', data.O');
+    [~] = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
+end
 % the 3d trajectory of the ball
 line(xL,yL,zL,'Color','k','LineWidth',3);
 end

@@ -47,6 +47,7 @@ while( v_h.reader.CurrentTime <= current.ending_time )
     debug = 0;
     if debug
         figure; imshow( v_h.report.foreground.mask );
+        viscircles( v_h.report.foreground.c_centers, v_h.report.foreground.c_radii);
         %figure;
     end
     
