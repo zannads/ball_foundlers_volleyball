@@ -15,8 +15,6 @@ classdef video_handler
         frame = [];             % Current frame.
         report = [];            % Current report. 
         old_report = cell(0);   % Memory of the reports.
-        
-        debug = 0;
     end
     
     methods
@@ -28,7 +26,7 @@ classdef video_handler
             obj.reader = VideoReader( video_directory );
            
             % Initialize the video player.
-            obj.player = vision.VideoPlayer('Position', [20, 400, 720, 1280]);
+            obj.player = vision.VideoPlayer('Position', [20, 400, 1280, 720]);
             
             % Initialize the memory. 
             obj.old_frame = cell( obj.memory, 1 );
@@ -48,28 +46,10 @@ classdef video_handler
         function obj = display_tracking( obj, ball, varargin )
             %DISPLAY_TRACKING Display the video with the ball position. 
             
-            if( ~isempty( ball ) & ~isempty( ball.bbox{end} ) )
+            if( ~isempty( ball ) && ~isempty( ball.bbox{end} ) )
                 % Contour of the ball. 
                 tframe = insertObjectAnnotation(obj.frame, 'rectangle', ...
                     ball.bbox{end}, ball.state{end});
-                
-                % During debug also show the detection of the imfindcircle
-                % method.
-                if obj.debug & nargin > 2
-                    f_prop = varargin{1};
-                    s_prop = varargin{2};
-                    
-                    if s_prop.length > 0
-                    tframe = insertObjectAnnotation(tframe, 'circle', ...
-                        [cell2mat(s_prop.centers), cell2mat(s_prop.radii)], "s", 'Color', 'red');
-                    
-                    end
-                    if f_prop.length > 0
-                    tframe = insertObjectAnnotation(tframe, 'circle', ...
-                        [cell2mat(f_prop.centers), cell2mat(f_prop.radii)], "f", 'Color', 'green');
-                    
-                    end
-                end
             end
             
             % Display the frame

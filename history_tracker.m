@@ -18,13 +18,21 @@ classdef history_tracker
                                     %    the predicted location, but not
                                     %    even blob matches have been found,
                                     %    thus it is hard to trust
+                                    
+                                    
         total_visible_count;        % how many times the ball has been "known" in the history
         consecutive_invisible;      % how many consecutive steps the ball has been "unknown"
-        length;                     % how many frame has been tracked
         starting_side;              % which side of the pitch the ball starts
         
         speed;                      % speed of the ball, useful only during tracking for prediction
         
+    end
+    
+    properties (Access=private)
+        point1_plane = [];
+        point2_plane = [];
+        
+        start_tracking_time = 0;
     end
     
     methods
@@ -36,7 +44,7 @@ classdef history_tracker
             obj.radii{1} = [];
             obj.bbox{1} = [];
             obj.state{1} = "unknown";
-            obj.length = 0;
+            
             obj.total_visible_count = 0;
             obj.consecutive_invisible = 0;
             obj.starting_side = 0;
@@ -53,7 +61,7 @@ classdef history_tracker
                 obj.bbox{end + 1} = [];
                 obj.radii{end + 1} = [];
                 obj.state{end + 1} = "unknown";
-                obj.length = obj.length + 1;
+                
                 %unchanged obj.total_visible_count;
                 obj.consecutive_invisible = obj.consecutive_invisible +1;
                 
@@ -61,8 +69,6 @@ classdef history_tracker
                 obj.image_coordinate{end + 1} = varargin{1};
                 obj.bbox{end + 1} = varargin{2};
                 obj.state{end + 1} = varargin{3};
-                obj.length = obj.length + 1;
-                
             end
         end
         
@@ -72,7 +78,7 @@ classdef history_tracker
             
             % if previous is unknown or is the beginning predict in the
             % same point
-            if obj.length == 1 | strcmp ( obj.state{end-1}, "unknown" )
+            if obj.length == 1 | strcmp ( obj.state{end-1}, "unknown" )>0 %#ok<OR2>
                 % repeat the same point
                 % set to predicted
                 % length = length +1
@@ -80,7 +86,7 @@ classdef history_tracker
                 obj.radii{end+1} = obj.radii{end};
                 obj.image_coordinate{end+1} = obj.image_coordinate{end};
                 obj.state{end+1} = "predicted";
-                obj.length = obj.length+1;
+                
                 % unchanged obj.total_visible_count
                 obj.consecutive_invisible = obj.consecutive_invisible + 1;
                 return;
@@ -104,7 +110,7 @@ classdef history_tracker
             obj.radii{end +1} = current.radii;
             obj.bbox{end+1} = bbox_from_circle( current.image_coordinate, current.radii, 'std');
             obj.state{end+1} = "predicted";
-            obj.length = obj.length + 1;
+            
             % unchanged obj.total_visible_count
             obj.consecutive_invisible = obj.consecutive_invisible + 1;
         end
@@ -163,7 +169,7 @@ classdef history_tracker
             %DISCARD_LAST remove the last object in the history
             % Two reason may be why we want it to be deleted. because we
             % want to (forced) because we lost the ball too many steps ago
-            if ( nargin > 2 & strcmp(varargin{1}, "forced")) | (obj.consecutive_invisible > 10)
+            if ( nargin > 2 & strcmp(varargin{1}, "forced")>0) | (obj.consecutive_invisible > 10) %#ok<OR2,AND2>
                 obj.image_coordinate{1} = [];
                 obj.bbox{end} = [];
                 obj.state{end} = "unknown";
@@ -326,19 +332,6 @@ classdef history_tracker
         end
         
         %% recovery
-        function out = is_lost( obj )
-            %OUT_LOST Returns if in the last 3 steps the ball is unknown. 
-            
-            st_1 = obj.state{end};
-            st_2 = obj.state{end-1};
-            st_3 = obj.state{end-2};
-            
-            comp = "unknown";
-            % compare
-            out = ( strcmp( st_1, comp) & strcmp( st_2, comp) & strcmp( st_3, comp) );
-        end
-        
-        
         function obj = recover( obj , infos )
             % RECOVER Prepared for recovery of the lost ball 
             steps = size(infos, 1);
@@ -357,6 +350,50 @@ classdef history_tracker
                 end
             end
         end
+        
+        %% set get
+        function obj = set_point( obj, which_one , point )
+            %SET_POINT Sets one of the two points of motion plane in the
+            %tracker
+            if which_one == 1
+                obj.point1_plane = point;
+            else 
+                obj.point2_plane = point;
+            end
+        end
+        
+        function out = get_point( obj, which_one)
+            %GET_POINT Gets one of the two points of motion plane.
+            if which_one == 1
+                out = obj.point1_plane;
+            else 
+                out = obj.point2_plane;
+            end
+        end
+        
+        function obj = set_starttime( obj, time )
+            %SET_STARTTIME Sets the starting time for tracking the ball
+            obj.start_tracking_time = time;
+        end
+        
+        function out = get_starttime( obj )
+            %GET_STARTTIME gets the time istant at which tracking should
+            %start.
+            out =  obj.start_tracking_time;
+        end
+        
+        function out = length( obj )
+            %LENGTH Answer the number of frame the object is been tracking
+            
+            out = size(obj.state, 2);
+        end
+        
+        function out = is_lost( obj )
+            %OUT_LOST Returns if in the last 5 steps the ball is unknown. 
+            
+           out = obj.consecutive_invisible > 5;
+        end
+        
     end
 end
 

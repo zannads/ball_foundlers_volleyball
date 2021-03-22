@@ -278,6 +278,7 @@ while step
         % update the conic
         [eq, params, ~, inlier_idx] = ball_foundlers_functionfit( x_, y_, 'conic', 'ransac', 'MaxDistance', max_distance/5 );
     end
+    
     % check how many of them are inlier of the new model
     if ~update || (sum(inlier_idx) < (length(inlier_idx)-2))
         % more then 2 points are outliers.

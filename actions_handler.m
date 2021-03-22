@@ -78,7 +78,7 @@ classdef actions_handler
             action = [];
             
             % If number is wrong, nothing is given back.
-            if step > obj.total | step < 1
+            if step > obj.total | step < 1 %#ok<OR2>
                 disp( "Invalid number of action." );
                 return;
             end
@@ -220,11 +220,8 @@ classdef actions_handler
             % When the referee whistle the action begins, an analysis of
             % the sound of the video should be used to detect this moment.
             
-            %I'm not able to detect the ball from a single frame, thus it's
-            %intial position is saved inisde the action_* struct.
+            % get the initial infomration of time of the service and side
             current = obj.get_action( obj.idx() );
-            x = current.position_x;
-            y = current.position_y;
             
             % Create the object to keep the informations during the track.
             ball = history_tracker();
@@ -236,12 +233,35 @@ classdef actions_handler
             ball.starting_side = current.starting_side;
             
             if( ball.starting_side == 0 ) % It's on the far side
+                pitch_side = [730, 1, 549, 240];
+                % get the jump
+                [p1, st_time] = ball_foundlers_jump_detector( obj, ...
+                    current.starting_time, pitch_side);
+                
+                % set them
+                ball = ball.set_point( 1, p1);
+                ball = ball.set_starttime( st_time );
+                
+                % look for the ball now
+                reader = VideoReader( obj.videoname );
+                reader.CurrentTime = st_time;
+                
+                % POSITION
+                frame = readFrame( reader );
+                f_h = figure; imshow( frame );
+                title( 'Select the starting position of the ball' );
+                
+                [x, y] = getpts();
+                x = x(1:2);
+                y = y(1:2);
+                close(f_h);
+                
                 % Save information of first position. 
                 ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
                 ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
                 ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
                 ball.state{end} = "known";
-                ball.length = 1;
+                
                 ball.total_visible_count = 1;
                 ball.consecutive_invisible = 0;
             else
