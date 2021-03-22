@@ -43,17 +43,40 @@ while ( v_h.reader.CurrentTime <= current.ending_time ) & ~ball.is_lost
     f_a = f_a.write_report( v_h.frame, v_h.old_frame{1}, last_known );
     v_h.report = f_a.get_report();
     
-    
-    if debug_track
-        figure; imshow( v_h.report.foreground.mask );
-        viscircles( v_h.report.foreground.c_centers, v_h.report.foreground.c_radii);
-        %figure;
-    end
-    
     % I add the prediction of the ball for this step, it is placed in the
     % last place of to the history, if I won't have any match this will
     % remain there under the label unknown.
     ball = ball.predict_location( );
+    
+    if debug_track
+        m1 = 255*v_h.report.foreground.mask;
+        f1 = [v_h.report.foreground.c_centers, v_h.report.foreground.c_radii];
+        
+        m2 = 255*v_h.report.stepper.mask;
+        s1 = [v_h.report.stepper.c_centers, v_h.report.stepper.c_radii];
+        
+        m3 = 255*v_h.report.hsv;
+        m4 = v_h.frame;
+        
+        if size(f1, 2) == 3
+            m1 = insertObjectAnnotation( m1, 'circle', f1, ...
+                'f');
+            m4 = insertObjectAnnotation( m4, 'circle', f1, ...
+                'f', 'Color', 'red' );
+        end
+        if size(s1, 2) == 3
+            m2 = insertObjectAnnotation( m2, 'circle', s1, ...
+                's');
+            m4 = insertObjectAnnotation( m4, 'circle', s1,...
+                's', 'Color', 'yellow' );
+        end
+        m4 = insertObjectAnnotation( m4, 'circle', [ball.image_coordinate{end}, ball.radii{end}], ...
+            'p', 'Color', 'green');
+        
+        
+        f_h = figure; montage( {m1, m2, m3, m4});
+        close(f_h);
+    end
     
     % Check if the prediction matches something from the analysis of the
     % frame

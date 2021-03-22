@@ -131,11 +131,11 @@ classdef history_tracker
             
             % for every of them, compute J as cost function
             x = obj.J_values( v_set, report.hsv );
-            lambda = [1, 30];
+            lambda = [1, 30, 30];
             J = lambda * x';
             
             % cost of marking the prediction wrong
-            cost_non_assignment = 100; % 70 pixel from prevision and 30 of color
+            cost_non_assignment = 130; % 70 pixel from prevision and 30 of color 30 f0r match
             % take min J idx
             [m, n] = min( J ) ;
             
@@ -310,7 +310,7 @@ classdef history_tracker
             if v_set.length == 0
                 % if nothing present set to infinity
                 
-                x = [inf, inf];
+                x = [inf, inf, inf];
                 return;
             end
             
@@ -318,7 +318,7 @@ classdef history_tracker
             % parameter 1 is distance from prevision
             distance_from_prev = v_set.d_prev ;
             
-            % x5
+            % x2
             % parameter 2 is how much yellow there is in the bbox
             color_ratio = zeros( v_set.length, 1);
             for idx = 1: v_set.length
@@ -327,8 +327,10 @@ classdef history_tracker
                 color_ratio(idx) = 1 - sum( mask, 'all' )/ ( size(mask, 1)* size(mask, 2) );
             end
             
+            not_matched = double( v_set.connect == 0);
+            
             % place them
-            x = [ distance_from_prev, color_ratio ];
+            x = [ distance_from_prev, color_ratio not_matched ];
         end
         
         %% recovery
