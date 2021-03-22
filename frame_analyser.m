@@ -22,7 +22,7 @@ classdef frame_analyser
         debug = 0; 
         
         % default Params
-        num_gaussians  = 5;        
+        num_gaussians  = 3;        
         minimum_back_ratio = 0.7;
         adapt_learning_rate = 0;
         train_frames = 500;
@@ -208,7 +208,7 @@ classdef frame_analyser
                 %affect the results and for fast changing scene may not provide
                 %stability to the algorithm.
                 %l_r = l_r.^(-1);
-                l_r = 0.005;
+                l_r = 0.005;%0.005
                 mask = obj.f_detector.step(frame, l_r);
             end
         end

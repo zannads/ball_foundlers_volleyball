@@ -44,6 +44,12 @@ while( v_h.reader.CurrentTime <= current.ending_time )
     f_a = f_a.write_report( v_h.frame, v_h.old_frame{1}, last_known );
     v_h.report = f_a.get_report();
     
+    debug = 0;
+    if debug
+        figure; imshow( v_h.report.foreground.mask );
+        %figure;
+    end
+    
     % I add the prediction of the ball for this step, it is placed in the
     % last place of to the history, if I won't have any match this will
     % remain there under the label unknown.
