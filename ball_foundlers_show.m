@@ -1,50 +1,48 @@
-function ball_foundlers_show( data, space, varargin )
-% BALL_FOUNDLERS_SHOW Shows the tracked ball in an image
+function ball_foundlers_show( ball, space, varargin )
+% BALL_FOUNDLERS_SHOW Shows the tracked ball in an image.
 
-%check data are correct
-if isempty( data.detected )
-    return;
-end
-
-% extract interesting data
-data = data.detected;
-num_points = size(data.frame, 1);
 
 if strcmp( space, '2d' )
+    % extract interesting data
+x_y = ball.get_known_positions;
+
     % when 2d is requested
     figure;
     
-    if nargin > 2 & strcmp( varargin{1}, 'background' )
-        % when I aslo have an image for the background I whow it beneath.
+    if nargin > 2 && strcmp( varargin{1}, 'background' )
+        % when I aslo have an image for the background I show it beneath.
         background = varargin{2};
         imshow( background );
         hold on;
+        plot( x_y(:, 1), x_y(:, 2), 'or', 'LineWidth', 5);
         
-        % plot all the points
-        for idx = 1:num_points
-            x_y = data.position{idx};
-            if ~isempty( x_y )
-                % callbacks were for eventual selection of the points
-                plot( x_y(1), x_y(2), 'or', 'LineWidth', 5, 'ButtonDownFcn', @point_select_callback);
-            end
-        end
     else
         % no image, thus I need to revert y axis
         hold on;
         
-        for idx = 1:num_points
-            x_y = data.position{idx};
-            if ~isempty( x_y )
-                % callbacks were for eventual selection of the points
-                plot( x_y(1), -x_y(2), 'or', 'LineWidth', 5, 'ButtonDownFcn', @point_select_callback);
-            end
-        end
+        lot( x_y(:, 1), -x_y(:, 2), 'or', 'LineWidth', 5);
     end
     
+    return;
 end
 
-% 3d in future, actually is done in ball_foundler_convert2dto3d
+% 3d 
 if strcmp( space, '3d' )
-    figure;
+    pitch = volleyball_pitch;
+    %now draw just the pitch
+    pitch.draw();
+    % the camera if possible
+    R = varargin{1};
+    O = varargin{2};
+    a = ver( 'MATLAB' );
+    if ~strcmp( a.Release, '(R2019b)')
+        pose = rigid3d( R', O');
+        [~] = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
+    else
+        plot3( O(1), O(2), O(3), 'or', 'MarkerSize', 3);
+    end
+    % the 3d trajectory of the ball
+    line( ball.trajectory3d.x, ball.trajectory3d.y, ball.trajectory3d.z, ...
+        'Color','k','LineWidth',3);
 end
 end

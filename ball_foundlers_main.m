@@ -1,7 +1,8 @@
 %ball_foundlers_main
-global debug_track debug_jump;
-debug_track = 1;
-debug_jump = 1;
+global debug_track debug_jump debug_conversion;
+debug_track = 0;
+debug_jump = 0;
+debug_conversion = 0;
 
 % create actions handler to manage the actions of the game.
 a_h = actions_handler( cd, 'actions.mat');

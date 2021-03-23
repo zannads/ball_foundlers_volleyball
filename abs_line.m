@@ -142,6 +142,12 @@ classdef abs_line
                y_n = 0;
            end
         end
+        
+        function angle = angle( obj )
+            %ANGLE Returns the orientation of the line in radiant.
+            
+            angle = atan( obj.params(2)/ obj.params(1) );
+        end
     end
 end
 

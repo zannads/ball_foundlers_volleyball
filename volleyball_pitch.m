@@ -90,7 +90,13 @@ classdef volleyball_pitch
                 plot3( [obj.pitch(13).params(1), obj.pitch(14).params(1)],...
                     [obj.pitch(13).params(2), obj.pitch(14).params(2)],...
                     [obj.pitch(13).params(3), obj.pitch(14).params(3)], '--k');
-            else
+            
+                % in case is a projected pitch without an image 
+            elseif obj.image_tp == -1
+                return;
+                
+            else 
+                
                 f_h = figure;
                 imshow(obj.image_tp);
                 
@@ -154,14 +160,17 @@ classdef volleyball_pitch
             %COMPLETE Creates a new istance of a pitch on the image
             % It projects all the real points on the image.
             % Plus it computes the average error between the new points and those that were present in the original image
-            obj_ = obj;
+            
+            % project a real one
+            obj_ = real_pitch.transform( P );
+            % copy the background to reenable drawing
+            obj_.image_tp = obj.image_tp;
+            
+            % compute error of projection
             error = 0;
             valid_points = 0;
            for idx = 1:14
-               %3x1 = 3x4 * [3x1; 1x1];
-               obj_.pitch(idx).params = P* [real_pitch.pitch(idx).params; 1];
-               obj_.pitch(idx) = obj_.pitch(idx).normalize();
-               if( obj.pitch(idx).is_valid() ) 
+               if( obj.pitch(idx).is_valid() && obj_.pitch(idx).is_valid()) 
                    d = obj_.pitch(idx).params(1:2)-obj.pitch(idx).params(1:2); 
                    error = error + d'*d;
                    valid_points = valid_points +1;
@@ -171,5 +180,87 @@ classdef volleyball_pitch
             error = error/valid_points;
         end
         
+        function obj_ = transform(obj, P)
+            %TRANSFORM Creates a new istance of a pitch on the image
+            %starting from a real one and a projection matrix
+            
+            % copy
+            obj_ = obj;
+            % change the points projecting 
+           for idx = 1:14
+               %3x1 = 3x4 * [3x1; 1x1];
+               obj_.pitch(idx).params = P* [obj.pitch(idx).params; 1];
+               obj_.pitch(idx) = obj_.pitch(idx).normalize();
+           end
+           
+           % disable drawing
+           obj_.image_tp = -1;
+        end
+        
+        function out = get_direction_of_play( obj, varargin )
+            % GET_DIRECTION_OF_PLAY Answer with the angles that the line of
+            % a projected pitch can stay to be moving along the direction
+            % of play
+            
+            if obj.image_tp == 0 & nargin == 2 %#ok<AND2>
+                P = varargin{1};
+                
+                proj = obj.transform( P );
+            else
+                
+                proj = obj;
+            end
+            
+            % now I can worrk with proj_pitch
+            % line 1 through origin
+            C = proj.pitch(3);
+            I = proj.pitch(9);
+            line1 = abs_line( passing_line( C, I ) );
+            
+            % line 2 opposite one
+            D = proj.pitch(4);
+            H = proj.pitch(8);
+            line2 = abs_line( passing_line( D, H ) );
+            
+            l1a = line1.angle;
+            l2a = line2.angle;
+            
+            out = [min(l1a, l2a), max(l1a, l2a)];
+            
+            
+        end
+        
+        function net = get_net( obj, varargin )
+           %GET_NET Returns the coordinate of the polygon describing the
+           %net in the format that matlab uses to describes polygons: x
+           %coordinates of the vertices and y coordinates of the vertices
+           %on different arrays, same index means same vertex. 
+           % This is used beacuse it its laso the fromat that inpolygon
+           % requires. Also the object polyshaped is passed.
+           
+            if obj.image_tp == 0 & nargin == 2 %#ok<AND2>
+                P = varargin{1};
+                
+                proj = obj.transform( P );
+            else
+                
+                proj = obj;
+            end
+            
+            % now I can worrk with proj_pitch
+            % the 4 points are 12 - 11
+            %                  14 - 13 
+            % with the reference system below 13 and 11 
+            A_ = proj.pitch(11);
+            F_ = proj.pitch(12);
+            A__ = proj.pitch(13);
+            F__ = proj.pitch(14);
+            
+            net.x = [A_.params(1), F_.params(1), F__.params(1), A__.params(1)];
+            net.y = [A_.params(2), F_.params(2), F__.params(2), A__.params(2)];
+            
+            net.poly = polyshape( net.x, net.y);
+        end
+                
     end
 end

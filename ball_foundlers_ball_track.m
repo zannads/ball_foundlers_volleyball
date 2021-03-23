@@ -13,7 +13,7 @@ function [a_h, v_h, f_a] = ball_foundlers_ball_track( a_h, v_h, f_a, idx )
 % less then 5 pixels. Since ball radius is mostly around 10 pixels this message is
 % printed many times.
 warning( 'off' );
-global debug_track;
+global debug_track debug_conversion;
 
 % acquire the action/service you are interested to
 current = a_h.get_action( idx );
@@ -24,13 +24,14 @@ ball = a_h.start_action();
 % I go the right moment in time on the reader
 v_h.reader.CurrentTime = ball.get_starttime;
 v_h = v_h.next_frame();
+start_frame = v_h.frame;
 
 % Startting positions are known, thus I'll show them.
 v_h = v_h.display_tracking( ball );
 
 % until the action ends
-while ( v_h.reader.CurrentTime <= current.ending_time ) & ~ball.is_lost
-    % Go to the successive frame
+while ( v_h.reader.CurrentTime <= current.ending_time ) & ~ball.stop_tracking %#ok<AND2>
+   % Go to the successive frame
     v_h = v_h.next_frame();
     
     % Important informations to reduce the search.
@@ -102,11 +103,25 @@ while ( v_h.reader.CurrentTime <= current.ending_time ) & ~ball.is_lost
     %%
     % Display video
     v_h = v_h.display_tracking( ball );
+    
+    ball = ball.check_end;
 end
+
+if debug_conversion
+    % show in 2d the trajectory of the ball.
+    ball_foundlers_show( ball, '2d', 'background', start_frame );
+end
+
 % referee has whistle again, ball has touched ground and the action is
 % ended. I save the history of the tracking and acquire the second point
-[~, a_h] = a_h.end_action( ball );
+a_h = a_h.end_action( ball );
 
-% now that I have tracked the ball I want to see it in 3d.
-ball_foundlers_convert2dto3d( a_h.get_complete_action, start_frame );
+ball = a_h.get_detection( idx );
+
+% show in 2d the trajectory of the ball.
+ball_foundlers_show( ball, '2d', 'background', start_frame );
+
+% 3d too 
+ball_foundlers_show( ball, '3d', a_h.get_camera_rotation, a_h.get_camera_position);
+
 end

@@ -180,7 +180,7 @@ if size( centroid, 1) > 1
     easylines = atan( easylines(:, 2)./easylines(:, 1) );
     
     % if it is not along the same direction of play
-    % to improve using volleyball pitch
+    % to improve using volleyball pitch get_direction_of_play??
     wrong_oriented = (easylines < 0) | ( easylines > 2 );
     
     

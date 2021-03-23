@@ -26,13 +26,42 @@ classdef history_tracker
         
         speed;                      % speed of the ball, useful only during tracking for prediction
         
+        % CONIC INFO
+        C_eq = [];
+        C_C = [];
+        C_linparam = [];
+        
+        % QUADRIC (CONE) INFO
+        Q_eq = [];
+        Q_Q = [];
+        Q_lin = [];
+        
+        % PLANE INFO 
+        P_eq = [];
+        P_P = [];
+        
+        % the 3 coordinate of the set of points where the action takes
+        % place will be saved here.
+        trajectory3d = [];
+        
     end
     
     properties (Access=private)
-        point1_plane = [];
-        point2_plane = [];
+        point1_plane = [];          % the points on the plan ewhere the 
+        point2_plane = [];          % action takes place.
         
-        start_tracking_time = 0;
+        start_tracking_time = 0;    % start of the tracking time [s]
+        
+        end_flag = 0;               % flag that explains how the action ends:
+                                    % when 0 ends due to time expiration. 
+                                    % when 1 ends due to consecutive
+                                    % invisible
+                                    % when 2 ends due to hit on the net 
+        
+        net = [];                   % struct containing the info of the ner
+                                    % net.x x coordinate of the vertices
+                                    % net.y y " "
+                                    % net.poly polyshape object of the net
     end
     
     methods
@@ -384,18 +413,100 @@ classdef history_tracker
             out =  obj.start_tracking_time;
         end
         
+        function obj = set_net( obj, net)
+            %SET_NET Save the net of the pitch where the action is taking
+            %place.
+            obj.net = net;
+        end
+        
+        function out = get_net( obj)
+            %GET_NET Returns the net struct of the pitch where the action
+            %is taking place.
+            out  = obj.net;
+        end
+        
         function out = length( obj )
-            %LENGTH Answer the number of frame the object is been tracking
+            %LENGTH Answer the number of frame the object is been tracking.
             
             out = size(obj.state, 2);
         end
         
-        function out = is_lost( obj )
-            %OUT_LOST Returns if in the last 5 steps the ball is unknown. 
+        function out = last_known( obj )
+            %LAST_KNOWN Returns the coordinates of the last "known" point. 
+           
+            p = obj.get_known_positions;
             
-           out = obj.consecutive_invisible > 5;
+            out = p(end, :);
         end
         
+        function out = get_known_positions( obj )
+            %GET_KNOWN_POSITIONS Returns all the points that are for sure
+            %known.
+            
+            p = obj.image_coordinate';
+            p = cell2mat( p );
+            
+            knownp = strcmpi( [obj.state{:}], "known" );
+            
+            out = p( knownp, : );
+        end
+            
+        %% TRACKING ANALYSIS
+        
+        function out = stop_tracking( obj )
+            
+            out = (obj.end_flag ~= 0);
+        end
+        
+        function out = get_end( obj )
+            
+            
+            out= obj.end_flag;
+        end
+        
+        function obj = check_end( obj )
+            
+            obj = obj.is_lost;
+            
+            obj = obj.hits_net;
+        end
+        
+        function obj = is_lost( obj )
+            %IS_LOST Returns if in the last 5 steps the ball is unknown. 
+            
+           obj.end_flag = obj.consecutive_invisible > 5;
+        end
+        
+       
+        function obj = hits_net( obj )
+            %HITS_NET Understands if the ball has stopped onto the net. 
+        
+            % take last point for speed
+            p(1, :) = obj.image_coordinate{end};
+            
+            % if it is on the net, and we have more point before that
+            if inpolygon( p(1, 1), p(1, 2), obj.net.x, obj.net.y ) 
+               p = obj.image_coordinate';
+               p = cell2mat( p );
+               
+               % look how many points are on the net. Usually the ball
+               % goes faster over the net and doesn't stop there. 
+               p_on_net = inpolygon( p(:, 1), p(:, 2), obj.net.x, obj.net.y );
+               
+               % count how many
+               if sum( p_on_net ) >= 3 
+                   % more then 3 points on the net means it has stopped
+                   % there. 
+                   obj.end_flag = 2;
+               end
+            end
+            
+            
+            %IMPROVEMENTS:
+            % actually you should also chechk that is moving along y only
+            % you should not count the unknown ones, maybe it founds the
+            % ball 3 steps later. 
+        end
     end
 end
 

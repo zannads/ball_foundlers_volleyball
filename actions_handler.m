@@ -18,7 +18,6 @@ classdef actions_handler
     properties
         set = [];   % Struct to save services informations. 
         det = [];   % Struct to save ball detections.
-        total = 0;  % NUmber of actions in set. 
     end
     
     properties (Access=private)
@@ -63,7 +62,7 @@ classdef actions_handler
             %   given back.
             
             % If we are at the end, do nothing.
-            if obj.idx() == obj.total
+            if obj.idx() == obj.lenght_set
                 disp( "No more actions saved in this match." );
                 return;
             end
@@ -78,7 +77,7 @@ classdef actions_handler
             action = [];
             
             % If number is wrong, nothing is given back.
-            if step > obj.total | step < 1 %#ok<OR2>
+            if step > obj.lenght_set | step < 1 %#ok<OR2>
                 disp( "Invalid number of action." );
                 return;
             end
@@ -89,6 +88,22 @@ classdef actions_handler
             % Get it with dynamic assignment.
             name = strcat( "action_", num2str( obj.idx() ) );
             action = obj.set.(name);
+        end
+        
+        function detection = get_detection( obj, step )
+            %GET_DETECTION Gives back the history tracker of the requested
+            %action saved in the object.
+            detection = [];
+            
+            % If number is wrong, nothing is given back.
+            if step > obj.lenght_det | step < 1 %#ok<OR2>
+                disp( "Invalid number of action." );
+                return;
+            end
+            
+            % Get it with dynamic assignment.
+            name = strcat( "action_", num2str( step ) );
+            detection = obj.det.(name);
         end
         
         function e = save_all( obj )
@@ -192,6 +207,16 @@ classdef actions_handler
             camera_parameters = obj.camera_parameters;
         end
         
+        function out = lenght_set( obj )
+            %LENGHT_SET The number of actions saved in the object.
+           out = numel( fieldnames( obj.set ) );
+        end
+        
+        function out = lenght_det( obj )
+            %LENGHT_DET The number of history trackers saved in the object.
+            out = numel( fieldnames( obj.det ) );
+        end
+        
         %%
         function range3d = get_range( obj ) 
            %GET_RANGE Builds an array used to project the quadrics in the
@@ -220,7 +245,7 @@ classdef actions_handler
             % When the referee whistle the action begins, an analysis of
             % the sound of the video should be used to detect this moment.
             
-            % get the initial infomration of time of the service and side
+            % get the initial information of time of the service and side
             current = obj.get_action( obj.idx() );
             
             % Create the object to keep the informations during the track.
@@ -241,6 +266,10 @@ classdef actions_handler
                 % set them
                 ball = ball.set_point( 1, p1);
                 ball = ball.set_starttime( st_time );
+                
+                % set the net
+                real_p = volleyball_pitch;
+                ball = ball.set_net( real_p.get_net( obj.get_P) );
                 
                 % look for the ball now
                 reader = VideoReader( obj.videoname );
@@ -269,355 +298,38 @@ classdef actions_handler
             end
         end
         
-        function [out, obj] = end_action( obj, ball )
+        function obj = end_action( obj, ball )
             %END_ACTION Saves the infromations of the tracking.
-            % Again, the referee whistle, ball has touched the ground and
+            % Again, the referee whistle and
             % the action has endeed. 
-            % With this setup is not possible to acquire this information,
-            % that is, again, saved in the struct of the action_*.
+            
+            % I have to understand the second point for the plane where the
+            % action take place based on how the ball stopped.
+            if ball.get_end == 0
+                % time expired
+            elseif ball.get_end == 1
+                % consecutive invisible! players check
+                
+            elseif ball.get_end == 2
+                % hits the net! fix x = 0
+                p = ball.last_known;
+                
+                p_ = point3d_from_2d( p(1), p(2), obj.get_P, 'x', 0);
+                
+                ball = ball.set_point( 2, p_);
+            end
+            
+            % now that I have tracked the ball I want to see it in 3d.
+            ball = ball_foundlers_convert2dto3d( ball, obj.get_P, obj.get_range );
+                
             name = strcat( 'action_', num2str( obj.idx() ) );
             
-            % Time and detection are saved. The cell structure is used
-            % because it allows to save empty arrays in case detection
-            % hasn't worked in some frame.
-            obj.det.(name).frame = cell( ball.length, 1);
-            obj.det.(name).position = cell( ball.length, 1);
+            % The history tracker is saved
+            obj.det.(name) = ball;
             
-            % I load the video again to avoid the saving of useless
-            % informations. It is slower but this operations are not done
-            % real time, thus I don't care of performance.
-            reader = VideoReader( obj.videoname );
-            
-            for idx = 1:ball.length
-                % Save the time.
-                obj.det.(name).frame{idx} = obj.set.(name).starting_time + (idx-1)/reader.FrameRate;
-               
-                if strcmp( ball.state{idx}, 'unknown' )
-                    % If the ball hasn't been detected save empty array.
-                    obj.det.(name).position{idx} = [];
-                else
-                    % else save the center of the ball.
-                    obj.det.(name).position{idx} = ball.image_coordinate{idx};
-                end
-            end
-          
-          out = [];
         end
         
-        function out = get_complete_action( obj )
-            %GET_COMPLETE_ACTION Format the useful informations after the
-            % tracking for plotting. 
-            
-            % Infos for nice plots with the camera.
-            out.P = obj.P;
-            out.R = obj.camera_rotation;
-            out.O = obj.camera_position;
-            out.range = obj.get_range();
-            
-            % Detections.
-            name = strcat( 'action_', num2str( obj.idx ) );
-            out.manual = obj.set.(name);
-            out.detected = obj.det.(name);
-        end
-        
-        function obj = add( obj, varargin )
-            %ADD This method save the information of a new action.
-            % How actions are defined: 
-            %   To understand the plane under which the trajectory takes
-            %   place we need two points along the trajectory. The third
-            %   constraint is the fact that this plane is vertical. Thus we
-            %   need the 3d coordinates of two points.
-            %   First point:
-            %       - Position of the foot on the floor before jump.
-            %       - Position of the foot on the floor after the jump. 
-            %       - Service starts between this two moments, the x-y
-            %       coordinates are found with the two points on the floor
-            %       (z = 0).
-            %   Second point:
-            %       - If the ball ends on the net, we know the x coordinate
-            %       is zero because it's the middle of the pitch. 
-            %       - If the ball ends on the ground, we know the z
-            %       coordinate is zero, because is on the floor.
-            %       - If the player hits the ball I get x-y coordinate of
-            %       the ball using the foots again.
-            % 
-            %   To track the ball we need this informations: 
-            %       - First detection of the ball is done manually. 
-            %       - Time of this detection
-            %       - Time when to end tracking.
-            
-            
-            if nargin > 1 
-                % If I fix the number, use that.
-                num = varargin{1};
-            else 
-                % Otherwise add to the end. 
-                num = obj.total + 1;
-            end
-               
-            % Create the name to use dynamic assignment of the fields of
-            % the struct.
-            name = strcat( "action_", num2str( num ) );
-            obj.set.(name) = [] ;
-            
-            % read the video and use it for the process.
-            reader = VideoReader( obj.videoname );
-            
-            %%
-            % JUMP INFO
-            %%%%% START OF THE JUMP 
-            str = input( "Insert approximate starting time of the jump:");
-            % go to that time.
-            reader.CurrentTime = str;
-            while str
-                % go to next frame
-                frame = readFrame( reader );
-                if exist( 'f_h', 'var' )
-                    close(f_h);
-                end
-                f_h = figure; imshow( frame );
-                % ask if is landing, if 0 then you can acquire point
-                str = input( 'Is the jump? Answer how many steps forward/backward you want to go: ' );
-                if str ~= 0
-                    %jump forward (one step has already been done in
-                    %readFrame)
-                    reader.CurrentTime = reader.CurrentTime + (str-1)/reader.FrameRate;
-                end
-            end
-           
-            % this function saves the clicked points. 
-            ball_foundlers_save_manual_clicked( 'reset' );
-            % I need 1 point from the start of the jump 
-            ball_foundlers_save_manual_clicked( 'set', 1 );
-            
-            % show the image
-            title( 'Select the starting point of the jump' );
-            p = detectHarrisFeatures(rgb2gray(frame));
-            hold on;
-            % let select the point
-            for idx = 1:p.Count
-                point = p(idx).Location;
-                % plot it and add the callback. The callback then will save
-                % on ball_foundlers_save_manual_clicked
-                plot(point(1), point(2), '*g', 'ButtonDownFcn', @point_select_callback );
-            end
-            figure( f_h );
-            
-            %wait until is selected
-            pause;
-            % save the starting point of the jump and the time.
-            obj.set.(name).jump_s_pos = ball_foundlers_save_manual_clicked( 'is_acquired' );
-            obj.set.(name).jump_s_time = reader.CurrentTime - 1/reader.FrameRate;
-            
-            %%
-            % END OF THE JUMP 
-            % next frame to find the landing
-            str = 1;
-            
-            while str
-                % go to next frame
-                frame = readFrame( reader );
-                if exist( 'f_h', 'var' )
-                    close(f_h);
-                end
-                f_h = figure; imshow( frame );
-                % ask if is landing, if yes acquire point
-                str = input( 'Is the landing? Answer how many steps forward/backward you want to go: ' );
-                if str ~= 0
-                    %jump forward (one step has already been done in
-                    %readFrame)
-                    reader.CurrentTime = reader.CurrentTime + (str-1)/reader.FrameRate;
-                end
-            end
-            
-             % I need another 1 point
-            ball_foundlers_save_manual_clicked( 'reset' );
-            ball_foundlers_save_manual_clicked( 'set', 1 );
-            
-            title( 'Select the ending point of the jump' );
-            p = detectHarrisFeatures(rgb2gray(frame));
-            hold on;
-            % let select the point
-            for idx = 1:p.Count
-                point = p(idx).Location;
-                plot(point(1), point(2), '*g', 'ButtonDownFcn', @point_select_callback );
-            end
-            figure( f_h );
-            
-            %wait until is selected
-            pause;
-            
-            % save the landing point of the jump and the time
-            obj.set.(name).jump_e_pos  = ball_foundlers_save_manual_clicked( 'is_acquired' );
-            obj.set.(name).jump_e_time = reader.CurrentTime - 1/reader.FrameRate;
-            
-            %%
-            % BALL USEFUL START
-            % The useful trajectory of the ball is between jump_st.rel_frame and  jump_end.rel_frame
-            
-            reader.CurrentTime = (obj.set.(name).jump_e_time+obj.set.(name).jump_s_time)/2;
-            obj.set.(name).ball_s_time = reader.CurrentTime;
-            
-            %%
-            % RECEIVED BALL
-            str = input( "Insert approximate starting time for the recpetion:");
-            reader.CurrentTime = str;
-            while str
-                % go to next frame
-                frame = readFrame( reader );
-                if exist( 'f_h', 'var' )
-                    close(f_h);
-                end
-                f_h = figure; imshow( frame ); 
-                
-                str = input( 'Has the ball been received? Answer how many steps forward/backward you want to go ' );
-                if str ~= 0
-                    %jump forward (one step has already been done in
-                    %readFrame)
-                    reader.CurrentTime = reader.CurrentTime + (str-1)/reader.FrameRate;
-                end
-            end
-            
-            % now I'm when the ball is received.
-            % I don't need the position, just the time to end the loop in
-            % the main program.
-            obj.set.(name).ball_e_time = reader.CurrentTime - 1/reader.FrameRate;
-            
-            % ask how the action ends:
-            disp( 'How does the action ends?');
-            disp( '1 On the net. ');
-            disp( '2 On the floor. ');
-            disp( '3 On the hands of a player. ');
-            str = input( 'Insert the answer: ');
-            
-            if str == 1
-                obj.set.(name).ball_e_mode = 1;
-                % Ends on the net, thus I will have the point coordinate x
-                % = 0
-                obj.set.(name).rec_s_pos  = [];
-                obj.set.(name).rec_s_time = obj.set.(name).ball_e_time;
-                obj.set.(name).rec_e_pos  = [];
-                obj.set.(name).rec_e_time = obj.set.(name).ball_e_time;
-                
-            elseif str == 2
-                obj.set.(name).ball_e_mode = 2;
-                % Ends on the floor, thus its height is the radius of a
-                % ball in the real world. (Approximated to 0)
-                obj.set.(name).rec_s_pos  = [];
-                obj.set.(name).rec_s_time = obj.set.(name).ball_e_time;
-                obj.set.(name).rec_e_pos  = [];
-                obj.set.(name).rec_e_time = obj.set.(name).ball_e_time;
-                
-            else
-                obj.set.(name).ball_e_mode = 3;
-                % Ends on the hand of a player receiving the ball,
-                % interpolate like in the start.
-                
-                % now let's triangulate with subsequent frame and the
-                % previous one. 
-                
-                % I need another 1 point
-                ball_foundlers_save_manual_clicked( 'reset' );
-                ball_foundlers_save_manual_clicked( 'set', 1 );
-                
-                % frame after the reception.
-                frame = readFrame( reader );
-                close(f_h);
-                f_h = figure; imshow( frame );
-                
-                title( 'Select ending point of reception');
-                p = detectHarrisFeatures(rgb2gray(frame));
-                hold on;
-                % let select the point
-                for idx = 1:p.Count
-                    point = p(idx).Location;
-                    plot(point(1), point(2), '*g', 'ButtonDownFcn', @point_select_callback );
-                end
-                figure( f_h );
-                
-                %wait until is selected
-                pause;
-                
-                obj.set.(name).rec_e_pos  = ball_foundlers_save_manual_clicked( 'is_acquired' );
-                obj.set.(name).rec_e_time = reader.CurrentTime - 1/reader.FrameRate;
-                
-                % Frame before the reception.
-                % Let's go two frames before, plus one for the last reading
-                reader.CurrentTime = reader.CurrentTime - 3/reader.FrameRate;
-                frame = readFrame( reader );
-                close(f_h);
-                f_h = figure; imshow( frame );
-                
-                % I need another 1 point
-                ball_foundlers_save_manual_clicked( 'reset' );
-                ball_foundlers_save_manual_clicked( 'set', 1 );
-                
-                title( 'Select starting point of reception');
-                p = detectHarrisFeatures(rgb2gray(frame));
-                hold on;
-                % let select the point
-                for idx = 1:p.Count
-                    point = p(idx).Location;
-                    plot(point(1), point(2), '*g', 'ButtonDownFcn', @point_select_callback );
-                end
-                figure( f_h );
-                
-                %wait until is selected
-                pause;
-                
-                
-                obj.set.(name).rec_s_pos  = ball_foundlers_save_manual_clicked( 'is_acquired' );
-                obj.set.(name).rec_s_time = reader.CurrentTime - 1/reader.FrameRate;
-            end
-            
-            %%
-            % TRACKING  PARAMS 
-            % START 
-            % TIME
-            str = input( "Insert approximate starting time of the detection:");
-            reader.CurrentTime = str;
-            
-            % POSITION
-            frame = readFrame( reader );
-            close(f_h);
-            f_h = figure; imshow( frame );
-            title( 'Select the starting position of the ball' );
-            
-            [x, y] = getpts();
-            x = x(1:2);
-            y = y(1:2);
-            % for this moment always right side, in future I can discriminate
-            % better
-            obj.set.(name).starting_side = 0;
-            
-            obj.set.(name).position_x = [ floor( min(x)), ceil( max(x) ) ];
-            obj.set.(name).position_y = [ floor( min(y)), ceil( max(y) ) ];
-            obj.set.(name).starting_time = str;
-            
-            % END
-            % TIME
-            str = input( "Insert ending time of detection:");
-            obj.set.(name).ending_time = str;
-            
-            close(f_h) ;
-            clc;
-            disp( "Thank you :) ");
-            obj.total = obj.total +1;
-        end
-        
-        function obj = replace( obj, number )
-            %REPLACE Replace one action with a new one. 
-            % Useful if you save some errors in an action.
-            
-            name = strcat( 'action_', num2str( number ) );
-            %Delete it.
-            obj.set.(name) = [];
-            obj.total = obj.total -1;
-            
-            %Create the new one.
-            obj = obj.add( number );
-        end
-        
+       
     end
     
     methods (Static)
