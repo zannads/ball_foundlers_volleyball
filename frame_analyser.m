@@ -323,6 +323,54 @@ classdef frame_analyser
             out = obj.report;
         end
         
+        function [x, y, radii] = detectball( obj, frame, player )
+            %DETECT_BALL Finds the first istance of the ball and returns it
+            %as the center and the radius.
+            
+            global debug_firstdetect;
+            
+            mask = obj.foreground_analysis( frame );
+            
+            % Concentrate on the 300 x 300 square around the position of
+            % the player
+            % Get the reduced mask and the shift of its high-left point
+            [mask_, v_x, v_y] = extract_roi( mask, player, 150 );
+            [p, r] = imfindcircles( mask_, [5, 15]);
+            p = p + [v_x, v_y];
+            
+            if debug_firstdetect
+                figure; imshow( mask ); 
+                viscircles( p, r, 'Color', 'red');
+                viscircles( player, 5, 'Color', 'blue');
+            end
+            
+            % remove too much on the right or left!
+            % get complex distance from player 
+            p_ = p - player;
+            % make x absolute, leave ywith sign
+            p_ = [ abs( p_(:,1) ), p_(:,2) ];
+            % remove based on x circles far on x more then 20
+            out_of_axis = p_(:,1) > 20;
+            p = p( ~out_of_axis, : );
+            r = r( ~out_of_axis, :);
+            p_ = p_(~out_of_axis, : );
+            
+            % take the highest one (on y means the minimum)
+            [~, midx] = min( p_(:, 2));
+            p = p(midx, :);
+            r = r(midx, :);
+            
+
+           if debug_firstdetect
+                figure; imshow( frame ); 
+                viscircles( p, r, 'Color', 'red');
+                viscircles( player, 5, 'Color', 'blue');
+           end
+            
+           x = p(1);
+           y = p(2);
+           radii = r;
+        end
         
     end
 end

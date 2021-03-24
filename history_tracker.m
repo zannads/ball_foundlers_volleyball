@@ -486,18 +486,34 @@ classdef history_tracker
             
             % if it is on the net, and we have more point before that
             if inpolygon( p(1, 1), p(1, 2), obj.net.x, obj.net.y ) 
-               p = obj.image_coordinate';
-               p = cell2mat( p );
+               p = obj.get_known_positions;
                
                % look how many points are on the net. Usually the ball
                % goes faster over the net and doesn't stop there. 
                p_on_net = inpolygon( p(:, 1), p(:, 2), obj.net.x, obj.net.y );
                
                % count how many
-               if sum( p_on_net ) >= 3 
-                   % more then 3 points on the net means it has stopped
-                   % there. 
-                   obj.end_flag = 2;
+               % more then 3 points on the net means it has stopped there.
+               enough = sum( p_on_net ) >= 3;
+               
+               if enough
+                   % look if it is moving down
+                   % take the ones on the net
+                   p = p( p_on_net, :);
+                   % last one is "end" of the tracking also
+                   % remove it to see how much it has moved along x
+                   p = p - p(end, :);
+                   
+                   % falling if along x is less then a quantity and y is
+                   % increasing, actually the highest is the last one is
+                   % perfect.
+                   [~, Midx] = max( p(:,2) );
+                   falling = (sum( p(:,1) ) < 30) & (Midx == size( p, 1) );
+                   
+                   if falling
+                       
+                       obj.end_flag = 2;
+                   end
                end
             end
             

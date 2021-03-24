@@ -4,7 +4,7 @@ function point = point3d_from_2d( u, v, P, fix_coord_name, fix_coord_value )
 
 %% setup
 % I use symbolic toolbox
-syms x y z k
+syms x y z k real
 
 % build the equation from X to u
 eq = [u == k*(P(1,1)*x + P(1,2)*y +P(1,3)*z + P(1,4) ), ...

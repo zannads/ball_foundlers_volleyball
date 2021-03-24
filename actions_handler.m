@@ -240,7 +240,7 @@ classdef actions_handler
            end
         end
         
-        function ball = start_action( obj )
+        function ball = start_action( obj, f_a )
             %START_ACTION Creates the object to start the detection. 
             % When the referee whistle the action begins, an analysis of
             % the sound of the video should be used to detect this moment.
@@ -274,21 +274,18 @@ classdef actions_handler
                 % look for the ball now
                 reader = VideoReader( obj.videoname );
                 reader.CurrentTime = st_time;
-                
-                % POSITION
                 frame = readFrame( reader );
-                f_h = figure; imshow( frame );
-                title( 'Select the starting position of the ball' );
                 
-                [x, y] = getpts();
-                x = x(1:2);
-                y = y(1:2);
-                close(f_h);
+                % I reproject p1 so I know where the ball is approximately
+                p1 = obj.get_P*[p1.x; p1.y; p1.z; 1];
+                p1 = [p1(1)/p1(3), p1(2)/p1(3)];
+                
+                [x, y, radii] = f_a.detectball( frame, p1);
                 
                 % Save information of first position. 
-                ball.bbox{end} = [x(1), y(1), (x(2)-x(1)), (y(2)-y(1))];
-                ball.radii{end} = mean( [(x(2)-x(1)), (y(2)-y(1))])/2;
-                ball.image_coordinate{end} = [ ((x(1)+x(2))/2),  ((y(1)+y(2))/2)];
+                ball.bbox{end} = bbox_from_circle( [x,y], radii, "std");
+                ball.radii{end} = radii;
+                ball.image_coordinate{end} = [ x,  y];
                 ball.state{end} = "known";
                 
                 ball.total_visible_count = 1;
@@ -298,7 +295,7 @@ classdef actions_handler
             end
         end
         
-        function obj = end_action( obj, ball )
+        function obj = end_action( obj, ball, recovery_info )
             %END_ACTION Saves the infromations of the tracking.
             % Again, the referee whistle and
             % the action has endeed. 
@@ -306,9 +303,13 @@ classdef actions_handler
             % I have to understand the second point for the plane where the
             % action take place based on how the ball stopped.
             if ball.get_end == 0
-                % time expired
+                % time expired there is no way
+                
             elseif ball.get_end == 1
                 % consecutive invisible! players check
+                p_ = ball_foundlers_hitdetection( ball, recovery_info );
+                
+                ball = ball.set_point( 2, p_);
                 
             elseif ball.get_end == 2
                 % hits the net! fix x = 0

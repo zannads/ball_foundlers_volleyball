@@ -19,7 +19,7 @@ global debug_track debug_conversion;
 current = a_h.get_action( idx );
 
 % I create the object to track the ball.
-ball = a_h.start_action();
+ball = a_h.start_action( f_a );
 
 % I go the right moment in time on the reader
 v_h.reader.CurrentTime = ball.get_starttime;
@@ -114,7 +114,7 @@ end
 
 % referee has whistle again, ball has touched ground and the action is
 % ended. I save the history of the tracking and acquire the second point
-a_h = a_h.end_action( ball );
+a_h = a_h.end_action( ball, v_h.prepare_for_recovery );
 
 ball = a_h.get_detection( idx );
 

@@ -291,7 +291,7 @@ while step
         c_par = params;
         
         % check if p1 or p2 were discarded, in case test them again on the
-        % new one
+        % new model
         if conic_inliers( m_idx-l_idx ) == 0
             % it was discarded
             distances = evalconic( c_par, p1);
@@ -375,7 +375,7 @@ end
 
     %% get two points
     % intersection between conic and the two lines. 
-    syms u v;
+    syms u v real;
     
     %line1
     eqns = [[c_par;1]'*[u^2; u*v; v^2; u; v; 1] == 0, [fl_par',1]*[u; v; 1] == 0 ]; 
@@ -396,8 +396,15 @@ end
         plot(p1(:,1), p1(:,2), 'm*');
         plot(p1(m_idx,1), p1(m_idx,2), 'w*', 'MarkerSize', 3 );
     end
-    % select it
-    p1 = p1(m_idx, :);
+    
+    % sometimes, the conic doesn't intersect with the lines. In this case
+    % neglect the intersection and take the closest point from the lines. 
+    if isempty( p1 )
+        p1 = [x_, y_];
+    else
+        % they intersect
+        p1 = p1(m_idx, :);
+    end
     
     % line2
     eqns = [[c_par;1]'*[u^2; u*v; v^2; u; v; 1] == 0, [sl_par',1]*[u; v; 1] == 0 ]; 
@@ -418,8 +425,16 @@ end
         plot(p2(:,1), p2(:,2), 'm*');
         plot(p2(m_idx,1), p2(m_idx,2), 'w*', 'MarkerSize', 3 );
     end
-    % select it
-    p2 = p2(m_idx, :);
+    
+    % sometimes, the conic doesn't intersect with the lines. In this case
+    % neglect the intersection and take the closest point from the lines. 
+    if isempty( p2 )
+        p2 = [x_, y_];
+    else
+        % they intersect
+        p2 = p2(m_idx, :);
+    end
+    
        
     %% 3d move
     %Jump line -> conic

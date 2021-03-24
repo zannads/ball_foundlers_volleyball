@@ -10,7 +10,7 @@ classdef video_handler
         % The memory of the system has been included in case the ball was to
         % recover after being lost to avoid to recompute everything since
         % it is the most computational heavy part. 
-        memory = 3;             % Memory of the system.
+        memory = 5;             % Memory of the system.
         old_frame = cell(0);    % Memory of the frames. 
         frame = [];             % Current frame.
         report = [];            % Current report. 
@@ -35,10 +35,10 @@ classdef video_handler
         
         function obj = update_old( obj )
             %UPDATE_OLD Save old frames and reports in memories.
-            obj.old_frame = [obj.old_frame(1); obj.old_frame(1:2)]; 
+            obj.old_frame = [obj.old_frame(1); obj.old_frame(1:end-1)]; 
             obj.old_frame{1} = obj.frame;
             
-            obj.old_report = [obj.old_report(1); obj.old_report(1:2)];
+            obj.old_report = [obj.old_report(1); obj.old_report(1:end-1)];
             obj.old_report{1} = obj.report;
         end
         
@@ -67,11 +67,11 @@ classdef video_handler
             %PREPARE_FOR_RECOVERY Thi method format the memory of the
             %object for recovery in case the ball is lost. This
             %informations have to be used outside.
-            frames = cell(4, 1);
+            frames = cell(obj.memory+1, 1);
             frames{1} = obj.frame; 
             frames(2:end) = obj.old_frame;
             
-            reports = cell(4, 1);
+            reports = cell(obj.memory+1, 1);
             reports{1} = obj.report;
             reports(2:end) = obj.old_report;
             
