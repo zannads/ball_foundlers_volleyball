@@ -10,7 +10,7 @@ classdef video_handler
         % The memory of the system has been included in case the ball was to
         % recover after being lost to avoid to recompute everything since
         % it is the most computational heavy part. 
-        memory = 5;             % Memory of the system.
+        memory = 10;             % Memory of the system.
         old_frame = cell(0);    % Memory of the frames. 
         frame = [];             % Current frame.
         report = [];            % Current report. 

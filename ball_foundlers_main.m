@@ -6,7 +6,7 @@ debug_jump = 0;
 debug_firstdetect = 0;
 debug_conversion = 0;
 debug_hitdetection = 0;
-
+%%
 % create actions handler to manage the actions of the game.
 a_h = actions_handler( cd, 'actions.mat');
 % create video handler to manage the reader and players for the video, it

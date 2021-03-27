@@ -103,9 +103,9 @@ C_ = contours(x2, z2, f3s, [0 0]);
 zL =  C_(2, 2:end);
 % Visualize the line.
 minz = min( point_1.z, point_2.z );
-xL = xL( zL>= minz );
-yL = yL( zL>= minz );
-zL = zL( zL>= minz );
+xL = xL( zL>= minz & zL < 10);
+yL = yL( zL>= minz & zL < 10);
+zL = zL( zL>= minz & zL < 10);
 
 if debug_conversion
     line(xL,yL,zL,'Color','k','LineWidth',3);

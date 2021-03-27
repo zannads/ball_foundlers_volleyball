@@ -17,7 +17,7 @@ classdef volleyball_pitch
             % A'' and F'' bottom of the net
             % If is real don't insert anything, otherwise insert something
             % just to know
-
+            
             if nargin >0
                 obj.image_tp = varargin{1};
             else
@@ -90,12 +90,12 @@ classdef volleyball_pitch
                 plot3( [obj.pitch(13).params(1), obj.pitch(14).params(1)],...
                     [obj.pitch(13).params(2), obj.pitch(14).params(2)],...
                     [obj.pitch(13).params(3), obj.pitch(14).params(3)], '--k');
-            
-                % in case is a projected pitch without an image 
+                
+                % in case is a projected pitch without an image
             elseif obj.image_tp == -1
                 return;
                 
-            else 
+            else
                 
                 f_h = figure;
                 imshow(obj.image_tp);
@@ -169,14 +169,14 @@ classdef volleyball_pitch
             % compute error of projection
             error = 0;
             valid_points = 0;
-           for idx = 1:14
-               if( obj.pitch(idx).is_valid() && obj_.pitch(idx).is_valid()) 
-                   d = obj_.pitch(idx).params(1:2)-obj.pitch(idx).params(1:2); 
-                   error = error + d'*d;
-                   valid_points = valid_points +1;
-               end
-               
-           end
+            for idx = 1:14
+                if( obj.pitch(idx).is_valid() && obj_.pitch(idx).is_valid())
+                    d = obj_.pitch(idx).params(1:2)-obj.pitch(idx).params(1:2);
+                    error = error + d'*d;
+                    valid_points = valid_points +1;
+                end
+                
+            end
             error = error/valid_points;
         end
         
@@ -186,15 +186,15 @@ classdef volleyball_pitch
             
             % copy
             obj_ = obj;
-            % change the points projecting 
-           for idx = 1:14
-               %3x1 = 3x4 * [3x1; 1x1];
-               obj_.pitch(idx).params = P* [obj.pitch(idx).params; 1];
-               obj_.pitch(idx) = obj_.pitch(idx).normalize();
-           end
-           
-           % disable drawing
-           obj_.image_tp = -1;
+            % change the points projecting
+            for idx = 1:14
+                %3x1 = 3x4 * [3x1; 1x1];
+                obj_.pitch(idx).params = P* [obj.pitch(idx).params; 1];
+                obj_.pitch(idx) = obj_.pitch(idx).normalize();
+            end
+            
+            % disable drawing
+            obj_.image_tp = -1;
         end
         
         function out = get_direction_of_play( obj, varargin )
@@ -231,13 +231,13 @@ classdef volleyball_pitch
         end
         
         function net = get_net( obj, varargin )
-           %GET_NET Returns the coordinate of the polygon describing the
-           %net in the format that matlab uses to describes polygons: x
-           %coordinates of the vertices and y coordinates of the vertices
-           %on different arrays, same index means same vertex. 
-           % This is used beacuse it its laso the fromat that inpolygon
-           % requires. Also the object polyshaped is passed.
-           
+            %GET_NET Returns the coordinate of the polygon describing the
+            %net in the format that matlab uses to describes polygons: x
+            %coordinates of the vertices and y coordinates of the vertices
+            %on different arrays, same index means same vertex.
+            % This is used beacuse it its laso the fromat that inpolygon
+            % requires. Also the object polyshaped is passed.
+            
             if obj.image_tp == 0 & nargin == 2 %#ok<AND2>
                 P = varargin{1};
                 
@@ -249,8 +249,8 @@ classdef volleyball_pitch
             
             % now I can worrk with proj_pitch
             % the 4 points are 12 - 11
-            %                  14 - 13 
-            % with the reference system below 13 and 11 
+            %                  14 - 13
+            % with the reference system below 13 and 11
             A_ = proj.pitch(11);
             F_ = proj.pitch(12);
             A__ = proj.pitch(13);
@@ -261,6 +261,31 @@ classdef volleyball_pitch
             
             net.poly = polyshape( net.x, net.y);
         end
+        
+        function pj_pitch = get_projection_pitch( obj, side, height, P )
+            
+            if side == 0
+                % right side
                 
+            else
+                %left side
+                p(1,:) = P*[0, 0, 0, 1]';
+                p(2,:) = P*[-9,0, 0, 1]';
+                p(3,:) = P*[-9,9, 0, 1]';
+                p(4,:) = P*[0, 9, 0, 1]';
+                
+                p(5,:) = P*[0, 0, height, 1]';
+                p(6,:) = P*[-9,0, height, 1]';
+                p(7,:) = P*[-9,9, height, 1]';
+                p(8,:) = P*[0, 9, height, 1]';
+            end
+            p = p ./ p(:,3);
+            pj_pitch.poly = polyshape( p(:, 1), p(:,2) );
+            pj_pitch.poly = convhull(pj_pitch.poly );
+            pj_pitch.x = pj_pitch.poly.Vertices(:, 1);
+            pj_pitch.y = pj_pitch.poly.Vertices(:, 2);
+        end
+        
+        
     end
 end

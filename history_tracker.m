@@ -160,11 +160,11 @@ classdef history_tracker
             
             % for every of them, compute J as cost function
             x = obj.J_values( v_set, report.hsv );
-            lambda = [1, 30, 30];
+            lambda = [1, 10, 30];
             J = lambda * x';
             
             % cost of marking the prediction wrong
-            cost_non_assignment = 130; % 70 pixel from prevision and 30 of color 30 f0r match
+            cost_non_assignment = 110; % 70 pixel from prevision and 30 of color 30 f0r match
             % take min J idx
             [m, n] = min( J ) ;
             

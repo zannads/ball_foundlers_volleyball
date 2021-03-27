@@ -307,7 +307,7 @@ classdef actions_handler
                 
             elseif ball.get_end == 1
                 % consecutive invisible! players check
-                p_ = ball_foundlers_hitdetection( ball, recovery_info );
+                p_ = ball_foundlers_hitdetection( obj, ball, recovery_info );
                 
                 ball = ball.set_point( 2, p_);
                 
