@@ -1,12 +1,14 @@
 function a_h = ball_foundlers_calibration( a_h )
 %BALL_FOUNDLERS_CALIBRATION Performs the calibration of the camera of a
 %given video
-
+global debug_calibration
 % create the object for reading the video
 videoReader = VideoReader( a_h.get_videoname );
 video_frame      = readFrame(videoReader);
-% show the frame to perfrom calibration
-figure, imshow(video_frame)
+if debug_calibration
+    % show the frame to perfrom calibration
+    figure, imshow(video_frame)
+end
 
 
 im_g = rgb2gray(video_frame);
@@ -62,7 +64,7 @@ while idx <= directions
     while k <= length( glines )
         line_ = glines{k};
         
-        % plot the lines 
+        % plot the lines
         figure(f_h);hold on;
         for m = 1:length( line_ )
             xy = [line_(m).point1; line_(m).point2];
@@ -86,7 +88,7 @@ while idx <= directions
         
         k = k+1;
     end
-    % get the vanishing point of this direction. 
+    % get the vanishing point of this direction.
     % (I use all of them because I've seen they are all parallel.
     set_vpoints(idx) = estimate_lsq( set_plines{idx}, 'vp', strcat('v', num2str(idx) ) );
     
@@ -174,13 +176,17 @@ while idx <= directions
     
 end
 
+if ~debug_calibration
+    close all;
+end
+
 % create the objects volleyball pitch
-% this is a real one in 3d 
+% this is a real one in 3d
 real_pitch = volleyball_pitch();
 % this is a projected one based on the frame
 image_pitch = volleyball_pitch( video_frame );
 
-% add the points with the selected lines 
+% add the points with the selected lines
 image_pitch = image_pitch.add_point( lx_0, ly_0, 'A');
 image_pitch = image_pitch.add_point( lx_0, ly_1, 'B');
 image_pitch = image_pitch.add_point( lx_0, ly_2, 'C');
@@ -201,24 +207,29 @@ image_pitch = image_pitch.add_point( lz_0, net_down, 'A__');
 image_pitch = image_pitch.add_point( lz_1, net_down, 'F__');
 
 % Extract camera parameters
-% P projection matrix 
-% R rotation matrix 
-% K calibration matrix 
-% O camera position 
+% P projection matrix
+% R rotation matrix
+% K calibration matrix
+% O camera position
 [P, R, K, O] = extract_camera_from_pitches( image_pitch ,real_pitch);
 
-% draw the pitch and the detected points.
-image_pitch.draw();
-
-% draw the real pitch and the camera wrt it
-real_pitch.draw();
-hold on;
-pose = rigid3d( R', O');
-[~] = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
-
-% Backproject to get also the missing points
-%[image_pitch, error] = image_pitch.complete(P, real_pitch);
-
+if debug_calibration
+    % draw the pitch and the detected points.
+    image_pitch.draw();
+    
+    % draw the real pitch and the camera wrt it
+    real_pitch.draw();
+    hold on;
+    a = ver( 'MATLAB' );
+    if ~strcmp( a.Release, '(R2019b)')
+        pose = rigid3d( R', O');
+        [~] = plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.3);
+    else
+        plot3( O(1), O(2), O(3), 'or', 'MarkerSize', 3);
+    end
+    % Backproject to get also the missing points
+    [image_pitch, error] = image_pitch.complete(P, real_pitch);
+end
 %save stuff on the action handler
 a_h = a_h.set_P( P );
 a_h = a_h.set_camera_position( O );

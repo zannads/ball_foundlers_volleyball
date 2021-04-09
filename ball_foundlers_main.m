@@ -1,6 +1,7 @@
 %ball_foundlers_main
 global debug_track debug_jump debug_conversion debug_hitdetection;
-global debug_firstdetect;
+global debug_firstdetect debug_calibration;
+debug_calibration = 0;
 debug_track = 0;
 debug_jump = 0;
 debug_firstdetect = 0;

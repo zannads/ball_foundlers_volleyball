@@ -154,6 +154,10 @@ if size( centroid, 1) > 1
                 bbox( idx, : ) = [];
                 % step back because we have eliminated one row
                 idx = idx-1;
+                % also reduce Midx if I remove a line before it
+                if idx < Midx 
+                    Midx = Midx-1;
+                end
             end
         end
         idx = idx +1;

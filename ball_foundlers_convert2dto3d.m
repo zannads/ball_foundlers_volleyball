@@ -10,7 +10,7 @@ p = ball.get_known_positions;
 
 % fit the conic on the plane
 [ball.C_eq, ball.C_linparam, ball.C_C, ~] = ...
-    ball_foundlers_functionfit( p(:, 1), p(:,2), 'conic', 'lsq' );
+    ball_foundlers_functionfit( p(:, 1), p(:,2), 'conic', 'lsq');
 
 range2d = [min( p(1, 1), p(end, 1) ), max( p(1, 1), p(end, 1) ),...
     1, 720];
@@ -102,10 +102,50 @@ yL = C_(2, 2:end);
 C_ = contours(x2, z2, f3s, [0 0]);
 zL =  C_(2, 2:end);
 % Visualize the line.
-minz = min( point_1.z, point_2.z );
-xL = xL( zL>= minz & zL < 10);
-yL = yL( zL>= minz & zL < 10);
-zL = zL( zL>= minz & zL < 10);
+if point_1.z == 0.9 & point_2.z == 0.7 %#ok<AND2>
+    minz = min( point_1.z, point_2.z );
+    select =  zL>= minz & zL < 10;
+else
+    % arrange
+    pts = [xL; yL; zL]';
+    % remove last point, that is the eone on the net
+    pts = pts - [point_1.x, point_1.y, point_1.z];
+    pts = pts(:,1).^2 + pts(:,2).^2 + pts(:,3).^2;
+    % once I got the distances, I get the idx of the fairest point and the
+    % closests one. 
+    [~, minidx] = min( pts );
+    [~, maxidx] = max( pts );
+    
+    % the index of the min and max could even be swapt so I take care using
+    % min and max of the indexis
+    st_idx = min(minidx, maxidx);
+    end_idx = max(minidx, maxidx);
+    
+    select =  zeros( size(xL) ) ;
+    select(1, st_idx:end_idx ) = ...
+        ones( 1, end_idx-st_idx+1) + 1;
+    select = select>0;
+    
+    % get the two branches
+    zL1 = zL( select );
+    zL2 = zL( ~select );
+    
+    % the down branch is the one with the lowest average
+    if  mean( zL1 ) < mean( zL2 )
+        % if it is inverted, the arc is split in two parts, thus one set
+        % will make a mess
+        
+        xL = [xL(end_idx+1:end), xL(1:end_idx)];
+        yL = [yL(end_idx+1:end), yL(1:end_idx)];
+        zL = [zL(end_idx+1:end), zL(1:end_idx)];
+        select = [ones(1, length(xL)-end_idx+st_idx-1), zeros(1, end_idx-st_idx+1) ];
+        select = select>0;
+    end
+end
+    
+xL = xL( select );
+yL = yL( select );
+zL = zL( select );
 
 if debug_conversion
     line(xL,yL,zL,'Color','k','LineWidth',3);

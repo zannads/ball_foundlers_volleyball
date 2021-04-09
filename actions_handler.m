@@ -280,6 +280,7 @@ classdef actions_handler
                 p1 = obj.get_P*[p1.x; p1.y; p1.z; 1];
                 p1 = [p1(1)/p1(3), p1(2)/p1(3)];
                 
+                % detect the first position of the ball
                 [x, y, radii] = f_a.detectball( frame, p1);
                 
                 % Save information of first position. 
@@ -303,20 +304,23 @@ classdef actions_handler
             % I have to understand the second point for the plane where the
             % action take place based on how the ball stopped.
             if ball.get_end == 0
-                % time expired there is no way
+                % time expired there is no way to understand anything
                 
             elseif ball.get_end == 1
                 % consecutive invisible! players check
                 p_ = ball_foundlers_hitdetection( obj, ball, recovery_info );
                 
+                % set the second point for the plane
                 ball = ball.set_point( 2, p_);
                 
             elseif ball.get_end == 2
                 % hits the net! fix x = 0
                 p = ball.last_known;
                 
+                % transform in 3d
                 p_ = point3d_from_2d( p(1), p(2), obj.get_P, 'x', 0);
                 
+                % set the second point for the plane
                 ball = ball.set_point( 2, p_);
             end
             
@@ -330,7 +334,47 @@ classdef actions_handler
             
         end
         
+       %%
+       function obj = add_action( obj )
+           %ADD_ACTION Adds a new action in the struct that hanelse the
+           %actions.
+           newact = strcat( 'action_', num2str(obj.lenght_set+1) );
+           
+           str_side = input( 'Which side is the action starting? [0 right]-[1-left] ' );
+           str_time = input( 'Which time is the action starting? numeric value: ' );
+           str_etime = input( 'Maximum action time end? numeric value: ' );
+           
+           setact =  struct( 'starting_side', str_side,...
+               'starting_time', str_time, 'ending_time', str_etime );
+           obj.set.(newact) = setact;
+           
+           obj.save_all;
+       end
        
+       function obj = remove_action( obj, value )
+           if nargin < 2
+               value = input( 'Which one do you want to erase? ');
+           end
+           
+           if value <= 0 | value> obj.lenght_set %#ok<OR2>
+               return;
+           end
+           
+           % start copying to the position before, in position value will
+           % be overwritten, while last will be double
+           for idx = value:obj.lenght_set-1
+               name_rem = strcat( 'action_', num2str(idx) );
+               name_cop = strcat( 'action_', num2str(idx+1) );
+               obj.set.(name_rem) = obj.set.(name_cop);
+           end
+           
+           
+           % remove last one
+           name_rem = strcat( 'action_', num2str(obj.lenght_set) );
+           obj.set = rmfield( obj.set, name_rem);
+           
+           obj.save_all;
+       end
     end
     
     methods (Static)

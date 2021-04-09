@@ -4,8 +4,8 @@ function ball_foundlers_show( ball, space, varargin )
 
 if strcmp( space, '2d' )
     % extract interesting data
-x_y = ball.get_known_positions;
-
+    x_y = ball.get_known_positions;
+    
     % when 2d is requested
     figure;
     
@@ -26,7 +26,7 @@ x_y = ball.get_known_positions;
     return;
 end
 
-% 3d 
+% 3d
 if strcmp( space, '3d' )
     pitch = volleyball_pitch;
     %now draw just the pitch

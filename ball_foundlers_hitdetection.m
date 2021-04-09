@@ -82,7 +82,7 @@ if debug_hitdetection
         plot( p__{idx} );
         plot( centroid(idx, 1), centroid(idx, 2), '*r' );
     end
-    
+    hold on;
     plot( centroid(midx, 1), centroid(midx, 2), '*k', 'MarkerSize', 5);
 end
 
